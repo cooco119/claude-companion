@@ -414,6 +414,14 @@ body {
 
 .msg-assistant pre code { background: none; padding: 0; }
 
+/* 호출 비용 안내 (어시스턴트 답변 아래 작은 글씨) */
+.msg-cost {
+  align-self: flex-start;
+  font-size: 13px;
+  color: var(--brown-soft, #8a7468);
+  padding: 0 6px;
+}
+
 .chat-input-row {
   display: flex;
   gap: 10px;

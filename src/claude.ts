@@ -43,9 +43,13 @@ interface RunOptions {
 
 /**
  * claude -p 호출. 성공 시 ClaudeResult, 실패 시 한국어 메시지의 ClaudeError로 reject.
+ *
+ * 프롬프트는 argv가 아닌 stdin으로 전달한다:
+ * - '-'로 시작하는 메시지(예: "--help가 뭐예요")가 CLI 플래그로 오인되는 것을 방지
+ * - Linux 단일 argv 한계(MAX_ARG_STRLEN=128KiB)를 넘는 긴 메시지의 E2BIG 실패 방지
  */
 export function runClaude(prompt: string, options: RunOptions = {}): Promise<ClaudeResult> {
-  const args = ['-p', prompt, '--output-format', 'json'];
+  const args = ['-p', '--output-format', 'json'];
   if (options.resumeSessionId) {
     args.push('--resume', options.resumeSessionId);
   }
@@ -55,7 +59,7 @@ export function runClaude(prompt: string, options: RunOptions = {}): Promise<Cla
   }
 
   return new Promise<ClaudeResult>((resolve, reject) => {
-    execFile(
+    const child = execFile(
       'claude',
       args,
       { maxBuffer: MAX_BUFFER, timeout: TIMEOUT_MS },
@@ -96,7 +100,7 @@ export function runClaude(prompt: string, options: RunOptions = {}): Promise<Cla
           const costUsd = typeof obj.total_cost_usd === 'number' ? obj.total_cost_usd : 0;
 
           if (obj.is_error === true) {
-            const detail = resultText ? ` (상세: ${truncate(resultText, 300)})` : '';
+            const detail = resultText ? ` ${explainDetail(resultText)}` : '';
             reject(new ClaudeError(`Claude가 요청을 처리하지 못했어요.${detail} 잠시 후 다시 시도해 주세요.`));
             return;
           }
@@ -123,12 +127,56 @@ export function runClaude(prompt: string, options: RunOptions = {}): Promise<Cla
         );
       }
     );
+
+    // 프롬프트를 stdin으로 전달
+    if (child.stdin) {
+      child.stdin.on('error', () => {
+        // 프로세스가 먼저 종료되면 EPIPE가 날 수 있다 — 결과는 콜백에서 처리되므로 무시
+      });
+      child.stdin.end(prompt);
+    }
   });
+}
+
+/**
+ * CLI의 영어/기술 에러 원문을 비개발자가 이해할 수 있는 한국어 안내로 변환.
+ * 흔한 케이스(로그인 만료, 사용량 한도 등)는 한국어 설명으로 바꾸고,
+ * 알 수 없는 에러만 참고용으로 영어 원문 일부를 덧붙인다.
+ */
+function explainDetail(detail: string): string {
+  const d = detail.toLowerCase();
+  if (
+    d.includes('invalid api key') ||
+    d.includes('please run /login') ||
+    d.includes('not logged in') ||
+    d.includes('authentication') ||
+    d.includes('unauthorized') ||
+    d.includes('401')
+  ) {
+    return '로그인이 안 되어 있거나 로그인이 만료된 것 같아요. 터미널에서 claude 를 실행해 다시 로그인해 주세요.';
+  }
+  if (d.includes('rate limit') || d.includes('usage limit') || d.includes('quota') || d.includes('429')) {
+    return '사용량 한도에 도달한 것 같아요. 잠시 기다렸다가 다시 시도해 주세요.';
+  }
+  if (
+    d.includes('network') ||
+    d.includes('enotfound') ||
+    d.includes('econnrefused') ||
+    d.includes('etimedout') ||
+    d.includes('fetch failed')
+  ) {
+    return '인터넷 연결에 문제가 있는 것 같아요. 연결 상태를 확인하고 다시 시도해 주세요.';
+  }
+  if (d.includes('overloaded') || d.includes('529') || d.includes('500') || d.includes('internal server error')) {
+    return 'Claude 서비스가 일시적으로 혼잡한 것 같아요. 잠시 후 다시 시도해 주세요.';
+  }
+  // 알 수 없는 에러 — 문의/검색에 쓸 수 있도록 원문 일부만 참고로 첨부
+  return `(참고용 원문: ${truncate(detail, 200)})`;
 }
 
 function buildExitError(err: Error, stderr: string | undefined): ClaudeError {
   const detail = (stderr ?? '').trim();
-  const suffix = detail ? ` (상세: ${truncate(detail, 300)})` : '';
+  const suffix = detail ? ` ${explainDetail(detail)}` : '';
   return new ClaudeError(`Claude 실행 중 오류가 발생했어요.${suffix} 잠시 후 다시 시도해 주세요.`);
 }
 

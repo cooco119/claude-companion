@@ -13,12 +13,34 @@
     return node;
   }
 
+  // 마크다운 → HTML 렌더. 모델 출력/레슨 등 신뢰할 수 없는 내용이 들어오므로
+  // marked 결과를 반드시 DOMPurify로 소독(sanitize)한 뒤에만 innerHTML에 넣는다 (XSS 방지).
+  // DOMPurify를 못 불러온 경우(CDN 차단 등)에는 HTML 렌더를 포기하고 일반 텍스트로 보여준다.
   function renderMarkdown(target, markdown) {
     try {
-      target.innerHTML = marked.parse(markdown || '');
+      if (typeof DOMPurify === 'undefined' || !DOMPurify.sanitize) {
+        target.textContent = markdown || '';
+        return;
+      }
+      target.innerHTML = DOMPurify.sanitize(marked.parse(markdown || ''));
     } catch (e) {
       target.textContent = markdown || '';
     }
+  }
+
+  // ~/.claude/projects의 인코딩된 디렉터리명('-Users-hong-Desktop-my-folder' 식)을
+  // 사람이 읽을 수 있는 이름(마지막 폴더명)으로 바꾼다.
+  function humanizeProject(project) {
+    if (!project) return '';
+    var parts = String(project).split('-').filter(function (p) { return p !== ''; });
+    if (parts.length === 0) return String(project);
+    return parts[parts.length - 1];
+  }
+
+  // 호출 비용(USD)을 작은 안내 문구로 덧붙인다 (레슨 6의 '비용 이야기'와 일치하도록 UI에 표시).
+  function appendCostNote(containerEl, costUsd) {
+    if (typeof costUsd !== 'number' || !(costUsd > 0)) return;
+    containerEl.appendChild(el('div', 'msg-cost', '💲 이번 호출 비용: 약 $' + costUsd.toFixed(4)));
   }
 
   function timeAgo(input) {
@@ -266,6 +288,7 @@
     apiPost('/api/chat', body).then(function (data) {
       currentChatSessionId = data.sessionId;
       appendMessage(chatMessagesEl, 'assistant', data.reply);
+      appendCostNote(chatMessagesEl, data.costUsd);
       scrollToBottom(chatMessagesEl);
       loadChatSessions();
     }).catch(function (err) {
@@ -315,7 +338,10 @@
       }
       sessions.forEach(function (s) {
         var btn = el('button', 'cc-session-item');
-        btn.appendChild(el('div', 'cc-session-project', '📁 ' + (s.project || '(알 수 없는 프로젝트)')));
+        var projectName = humanizeProject(s.project);
+        var projectEl = el('div', 'cc-session-project', '📁 ' + (projectName || '(알 수 없는 프로젝트)'));
+        projectEl.title = s.project || ''; // 원본(인코딩된) 이름은 툴팁으로
+        btn.appendChild(projectEl);
         btn.appendChild(el('div', 'cc-session-preview', s.preview || '(미리보기 없음)'));
         btn.appendChild(el('div', 'cc-session-time', timeAgo(s.mtime)));
         btn.addEventListener('click', function () {
@@ -323,7 +349,7 @@
           btn.classList.add('active');
           selectedCcSession = s;
           $('#selected-session-label').textContent =
-            '선택한 작업: ' + (s.project || '') + ' — ' + (s.preview || '').slice(0, 60);
+            '선택한 작업: ' + (projectName || '') + ' — ' + (s.preview || '').slice(0, 60);
           adviseControlsEl.classList.remove('hidden');
           adviseResultEl.classList.add('hidden');
           hideError(adviseErrorEl);
@@ -349,6 +375,7 @@
 
     apiPost('/api/companion/advise', body).then(function (data) {
       renderMarkdown(adviseResultEl, data.advice);
+      appendCostNote(adviseResultEl, data.costUsd);
       adviseResultEl.classList.remove('hidden');
     }).catch(function (err) {
       showError(adviseErrorEl, err.message);
@@ -397,6 +424,7 @@
     apiPost('/api/companion/refine', body).then(function (data) {
       refineSessionId = data.sessionId;
       appendMessage(refineMessagesEl, 'assistant', data.reply);
+      appendCostNote(refineMessagesEl, data.costUsd);
       scrollToBottom(refineMessagesEl);
       refineSendBtn.textContent = '답장 보내기';
       refineResetBtn.classList.remove('hidden');

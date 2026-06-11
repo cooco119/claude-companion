@@ -187,6 +187,23 @@ app.use('/api', (_req: Request, res: Response) => {
   res.status(404).json({ error: '존재하지 않는 API 경로예요.' });
 });
 
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   console.log(`http://localhost:${PORT} 에서 실행 중`);
+});
+
+// 포트 충돌 등 listen 실패를 영어 스택트레이스 대신 한국어 안내로 보여준다.
+server.on('error', (err: NodeJS.ErrnoException) => {
+  if (err.code === 'EADDRINUSE') {
+    console.error('');
+    console.error(`⚠️  포트가 이미 사용 중이에요. (포트 ${PORT})`);
+    console.error('   이미 앱이 켜져 있을 가능성이 커요. 브라우저에서 아래 주소를 먼저 열어 보세요.');
+    console.error(`   → http://localhost:${PORT}`);
+    console.error('   이미 잘 열린다면 그대로 쓰시면 됩니다.');
+    console.error('   그래도 안 되면, 켜져 있는 다른 터미널 창을 닫거나 컴퓨터를 재시작한 뒤 npm start 를 다시 실행해 주세요.');
+  } else if (err.code === 'EACCES') {
+    console.error(`⚠️  포트 ${PORT} 을(를) 사용할 권한이 없어요. PORT 환경변수로 3456 같은 다른 번호를 지정해 보세요.`);
+  } else {
+    console.error('⚠️  서버를 시작하지 못했어요.', err.message);
+  }
+  process.exit(1);
 });

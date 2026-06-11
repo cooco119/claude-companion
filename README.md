@@ -16,14 +16,27 @@
 
 ### ② 이 앱 설치하기
 
-터미널(글자로 컴퓨터에 명령을 내리는 창)을 열고, 아래 두 줄을 한 줄씩 복사해서 붙여넣고 Enter(엔터)를 누르세요.
+이 단계에서는 `git`(깃)이라는 도구를 사용해요. 먼저 git이 컴퓨터에 있는지 확인해 봅시다. 터미널(글자로 컴퓨터에 명령을 내리는 창)을 열고 아래를 입력해 보세요.
+
+```bash
+git --version
+```
+
+`git version 2.x.x` 처럼 숫자가 나오면 이미 설치된 거예요. 다음으로 넘어가세요. 만약 에러가 나면(예: "용어가 인식되지 않습니다", "command not found") 아래처럼 git을 먼저 설치하세요.
+
+- **Windows**: 브라우저에서 [https://git-scm.com/download/win](https://git-scm.com/download/win) 을 열어 설치 파일을 내려받고, 설치 화면에서 계속 "Next"를 눌러 기본 설정 그대로 설치하세요. 설치가 끝나면 **터미널 창을 닫았다가 다시 열고** 위의 `git --version`으로 확인하세요.
+- **macOS(맥)**: 터미널에 `git` 이라고 입력하면 "명령어 라인 개발자 도구(Command Line Tools)를 설치하시겠습니까?"라는 창이 뜰 수 있어요. **"설치"를 눌러 주세요.** 몇 분 걸릴 수 있고, 끝나면 git도 함께 설치됩니다.
+
+git이 준비됐으면, 아래 세 줄을 **한 줄씩** 복사해서 붙여넣고 Enter(엔터)를 누르세요. (한 줄 입력하고 Enter, 끝나면 다음 줄 — 이 순서예요. 특히 Windows의 기본 PowerShell에서는 두 명령을 `&&`로 이어 붙이면 에러가 나니 꼭 한 줄씩 실행하세요.)
 
 ```bash
 git clone https://github.com/cooco119/claude-companion.git
-cd claude-companion && npm install
+cd claude-companion
+npm install
 ```
 
 - `git clone`은 "이 앱을 인터넷에서 내 컴퓨터로 내려받기"라는 뜻이에요.
+- `cd claude-companion`은 "방금 내려받은 폴더 안으로 이동하기"예요.
 - `npm install`은 "앱이 돌아가는 데 필요한 부품들을 자동으로 챙겨오기"입니다.
 
 ### ③ 앱 켜고 브라우저로 열기
