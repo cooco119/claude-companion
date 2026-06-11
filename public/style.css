@@ -1,0 +1,542 @@
+/* ============ 클로드 컴패니언 — 따뜻한 크림/코랄 테마 ============ */
+
+:root {
+  --cream: #fdf6ec;
+  --cream-deep: #f7ead8;
+  --coral: #ff7a59;
+  --coral-deep: #e8603f;
+  --coral-soft: #ffe3da;
+  --peach: #ffd9b8;
+  --brown: #4a3728;
+  --brown-soft: #7a6a5c;
+  --white: #fffdf9;
+  --red-bg: #ffe5e2;
+  --red-border: #f3a097;
+  --red-text: #b3372a;
+  --green: #5ba47a;
+  --radius: 16px;
+  --radius-sm: 12px;
+  --shadow: 0 4px 14px rgba(120, 80, 40, 0.10);
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+}
+
+body {
+  font-family: "Apple SD Gothic Neo", "Pretendard", "Noto Sans KR", -apple-system, BlinkMacSystemFont, "Segoe UI", "Malgun Gothic", sans-serif;
+  font-size: 17px;
+  line-height: 1.65;
+  color: var(--brown);
+  background: var(--cream);
+}
+
+.app {
+  display: flex;
+  height: 100vh;
+}
+
+/* ---------- 사이드바 ---------- */
+.sidebar {
+  width: 240px;
+  flex-shrink: 0;
+  background: var(--white);
+  border-right: 2px solid var(--cream-deep);
+  display: flex;
+  flex-direction: column;
+  padding: 24px 16px;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 4px 8px 20px;
+  border-bottom: 2px dashed var(--cream-deep);
+  margin-bottom: 20px;
+}
+
+.brand-emoji { font-size: 34px; }
+.brand-title { font-size: 19px; font-weight: 800; }
+.brand-sub { font-size: 13px; color: var(--brown-soft); }
+
+.tabs {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.tab-btn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 14px 16px;
+  font-size: 17px;
+  font-weight: 700;
+  font-family: inherit;
+  color: var(--brown);
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.15s ease;
+}
+
+.tab-btn:hover { background: var(--cream); }
+
+.tab-btn.active {
+  background: var(--coral-soft);
+  color: var(--coral-deep);
+}
+
+.tab-emoji { font-size: 20px; }
+
+.sidebar-footer {
+  margin-top: auto;
+  font-size: 13px;
+  color: var(--brown-soft);
+  padding: 8px;
+}
+
+/* ---------- 메인 ---------- */
+.main {
+  flex: 1;
+  overflow-y: auto;
+  padding: 32px 40px 60px;
+}
+
+.view { display: none; max-width: 1080px; margin: 0 auto; }
+.view.active { display: block; }
+
+.view-header h1 {
+  margin: 0 0 6px;
+  font-size: 28px;
+}
+
+.view-desc {
+  margin: 0 0 24px;
+  font-size: 16px;
+  color: var(--brown-soft);
+}
+
+/* ---------- 공통 요소 ---------- */
+.card {
+  background: var(--white);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 24px;
+}
+
+.btn {
+  font-family: inherit;
+  font-size: 16px;
+  font-weight: 700;
+  padding: 12px 22px;
+  border: none;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: transform 0.1s ease, background 0.15s ease;
+}
+
+.btn:active { transform: scale(0.97); }
+
+.btn-primary {
+  background: var(--coral);
+  color: #fff;
+}
+
+.btn-primary:hover { background: var(--coral-deep); }
+
+.btn-primary:disabled {
+  background: var(--peach);
+  color: #b08a6a;
+  cursor: not-allowed;
+}
+
+.btn-ghost {
+  background: transparent;
+  color: var(--brown-soft);
+  border: 2px solid var(--cream-deep);
+}
+
+.btn-ghost:hover { background: var(--cream); }
+
+.btn-block { width: 100%; }
+
+.hidden { display: none !important; }
+
+.loading-note, .empty-note {
+  color: var(--brown-soft);
+  font-size: 16px;
+  padding: 16px 8px;
+}
+
+.error-box {
+  background: var(--red-bg);
+  border: 2px solid var(--red-border);
+  color: var(--red-text);
+  border-radius: var(--radius-sm);
+  padding: 14px 18px;
+  margin: 12px 0;
+  font-size: 16px;
+}
+
+.thinking-note {
+  background: var(--cream-deep);
+  border-radius: var(--radius-sm);
+  padding: 14px 18px;
+  margin: 12px 0;
+  font-size: 16px;
+  animation: pulse 1.6s ease-in-out infinite;
+}
+
+.thinking-sub { color: var(--brown-soft); font-size: 14px; }
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.55; }
+}
+
+/* ---------- 배우기 ---------- */
+.learn-layout {
+  display: flex;
+  gap: 24px;
+  align-items: flex-start;
+}
+
+.lesson-list-pane { width: 280px; flex-shrink: 0; }
+
+.pane-title {
+  font-size: 17px;
+  margin: 0 0 12px;
+  color: var(--brown-soft);
+}
+
+.lesson-list { display: flex; flex-direction: column; gap: 10px; }
+
+.lesson-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  font-family: inherit;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--brown);
+  background: var(--white);
+  border: 2px solid transparent;
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow);
+  padding: 14px 16px;
+  cursor: pointer;
+  transition: border-color 0.15s ease;
+}
+
+.lesson-item:hover { border-color: var(--peach); }
+.lesson-item.active { border-color: var(--coral); background: var(--coral-soft); }
+
+.lesson-order {
+  display: inline-block;
+  background: var(--peach);
+  color: var(--brown);
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 800;
+  padding: 1px 10px;
+  margin-right: 8px;
+}
+
+.lesson-content-pane { flex: 1; min-width: 0; }
+
+/* ---------- 마크다운 렌더 ---------- */
+.markdown { font-size: 17px; }
+.markdown h1 { font-size: 26px; margin-top: 0; }
+.markdown h2 { font-size: 22px; margin-top: 28px; }
+.markdown h3 { font-size: 19px; }
+.markdown p { margin: 12px 0; }
+.markdown li { margin: 6px 0; }
+.markdown img { max-width: 100%; }
+
+.markdown code {
+  background: var(--cream-deep);
+  border-radius: 6px;
+  padding: 2px 7px;
+  font-size: 15px;
+  font-family: "SF Mono", Consolas, "Nanum Gothic Coding", monospace;
+}
+
+.markdown pre {
+  background: #fbf1e3;
+  border: 1px solid var(--cream-deep);
+  border-radius: var(--radius-sm);
+  padding: 16px;
+  overflow-x: auto;
+}
+
+.markdown pre code { background: none; padding: 0; }
+
+.markdown blockquote {
+  margin: 12px 0;
+  padding: 8px 18px;
+  border-left: 5px solid var(--coral);
+  background: var(--coral-soft);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+}
+
+.markdown table { border-collapse: collapse; width: 100%; }
+.markdown th, .markdown td {
+  border: 1px solid var(--cream-deep);
+  padding: 8px 12px;
+  text-align: left;
+}
+.markdown th { background: var(--cream); }
+
+/* ---------- 채팅 ---------- */
+.chat-layout {
+  display: flex;
+  gap: 24px;
+  align-items: flex-start;
+}
+
+.chat-sessions-pane {
+  width: 260px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.session-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+.session-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  font-family: inherit;
+  background: var(--white);
+  border: 2px solid transparent;
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow);
+  padding: 12px 14px;
+  cursor: pointer;
+  transition: border-color 0.15s ease;
+}
+
+.session-item:hover { border-color: var(--peach); }
+.session-item.active { border-color: var(--coral); background: var(--coral-soft); }
+
+.session-item-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--brown);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.session-item-meta {
+  font-size: 13px;
+  color: var(--brown-soft);
+  margin-top: 2px;
+}
+
+.chat-main-pane {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  min-height: 480px;
+}
+
+.chat-messages {
+  flex: 1;
+  overflow-y: auto;
+  max-height: 55vh;
+  min-height: 280px;
+  padding: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.msg {
+  max-width: 85%;
+  padding: 12px 18px;
+  border-radius: var(--radius);
+  font-size: 16px;
+  word-break: break-word;
+}
+
+.msg-user {
+  align-self: flex-end;
+  background: var(--coral);
+  color: #fff;
+  border-bottom-right-radius: 4px;
+  white-space: pre-wrap;
+}
+
+.msg-assistant {
+  align-self: flex-start;
+  background: var(--cream-deep);
+  color: var(--brown);
+  border-bottom-left-radius: 4px;
+}
+
+.msg-assistant > *:first-child { margin-top: 0; }
+.msg-assistant > *:last-child { margin-bottom: 0; }
+
+.msg-assistant pre {
+  background: #fff;
+  border-radius: 10px;
+  padding: 12px;
+  overflow-x: auto;
+  font-size: 14px;
+}
+
+.msg-assistant code {
+  background: rgba(255, 255, 255, 0.7);
+  border-radius: 5px;
+  padding: 1px 5px;
+  font-size: 14px;
+  font-family: "SF Mono", Consolas, monospace;
+}
+
+.msg-assistant pre code { background: none; padding: 0; }
+
+.chat-input-row {
+  display: flex;
+  gap: 10px;
+  margin-top: 14px;
+  align-items: flex-end;
+}
+
+.chat-input-row textarea {
+  flex: 1;
+  font-family: inherit;
+  font-size: 16px;
+  padding: 12px 16px;
+  border: 2px solid var(--cream-deep);
+  border-radius: var(--radius-sm);
+  resize: vertical;
+  background: var(--white);
+  color: var(--brown);
+}
+
+.chat-input-row textarea:focus {
+  outline: none;
+  border-color: var(--coral);
+}
+
+/* ---------- 컴패니언 ---------- */
+.companion-section { margin-bottom: 40px; }
+
+.section-title { font-size: 21px; margin: 0 0 4px; }
+
+.section-desc {
+  margin: 0 0 16px;
+  font-size: 15px;
+  color: var(--brown-soft);
+}
+
+.cc-session-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 320px;
+  overflow-y: auto;
+  margin-bottom: 14px;
+}
+
+.cc-session-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  font-family: inherit;
+  background: var(--white);
+  border: 2px solid transparent;
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow);
+  padding: 12px 16px;
+  cursor: pointer;
+  transition: border-color 0.15s ease;
+}
+
+.cc-session-item:hover { border-color: var(--peach); }
+.cc-session-item.active { border-color: var(--coral); background: var(--coral-soft); }
+
+.cc-session-project { font-size: 15px; font-weight: 800; color: var(--coral-deep); }
+.cc-session-preview {
+  font-size: 15px;
+  color: var(--brown);
+  margin-top: 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cc-session-time { font-size: 13px; color: var(--brown-soft); margin-top: 2px; }
+
+.advise-controls { margin-bottom: 12px; }
+
+.selected-session-label {
+  font-size: 15px;
+  color: var(--brown-soft);
+  margin-bottom: 8px;
+}
+
+.advise-input-row { display: flex; gap: 10px; }
+
+.advise-input-row input {
+  flex: 1;
+  font-family: inherit;
+  font-size: 16px;
+  padding: 12px 16px;
+  border: 2px solid var(--cream-deep);
+  border-radius: var(--radius-sm);
+  background: var(--white);
+  color: var(--brown);
+}
+
+.advise-input-row input:focus {
+  outline: none;
+  border-color: var(--coral);
+}
+
+.refine-card { display: flex; flex-direction: column; }
+
+.refine-messages { max-height: 45vh; min-height: 120px; }
+
+.refine-btn-col {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* ---------- 좁은 화면 ---------- */
+@media (max-width: 860px) {
+  .app { flex-direction: column; height: auto; }
+  .sidebar {
+    width: 100%;
+    flex-direction: row;
+    align-items: center;
+    padding: 12px 16px;
+    border-right: none;
+    border-bottom: 2px solid var(--cream-deep);
+  }
+  .brand { border-bottom: none; margin-bottom: 0; padding-bottom: 4px; }
+  .tabs { flex-direction: row; margin-left: auto; }
+  .sidebar-footer { display: none; }
+  .main { padding: 20px 16px 40px; }
+  .learn-layout, .chat-layout { flex-direction: column; }
+  .lesson-list-pane, .chat-sessions-pane { width: 100%; }
+}

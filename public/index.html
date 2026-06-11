@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>클로드 컴패니언</title>
+  <link rel="stylesheet" href="style.css" />
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+</head>
+<body>
+  <div class="app">
+    <!-- 사이드바 -->
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-emoji">🧡</div>
+        <div class="brand-text">
+          <div class="brand-title">클로드 컴패니언</div>
+          <div class="brand-sub">코딩 몰라도 괜찮아요</div>
+        </div>
+      </div>
+      <nav class="tabs">
+        <button class="tab-btn active" data-tab="learn">
+          <span class="tab-emoji">🎓</span> 배우기
+        </button>
+        <button class="tab-btn" data-tab="chat">
+          <span class="tab-emoji">💬</span> 채팅
+        </button>
+        <button class="tab-btn" data-tab="companion">
+          <span class="tab-emoji">🧭</span> 컴패니언
+        </button>
+      </nav>
+      <div class="sidebar-footer" id="health-status"></div>
+    </aside>
+
+    <!-- 메인 -->
+    <main class="main">
+
+      <!-- 🎓 배우기 -->
+      <section class="view active" id="view-learn">
+        <header class="view-header">
+          <h1>🎓 배우기</h1>
+          <p class="view-desc">Claude Code가 처음이어도 괜찮아요. 차근차근 따라올 수 있는 한국어 레슨이에요.</p>
+        </header>
+        <div class="learn-layout">
+          <div class="lesson-list-pane">
+            <h2 class="pane-title">레슨 목록</h2>
+            <div id="lesson-list" class="lesson-list">
+              <div class="loading-note">레슨을 불러오는 중이에요…</div>
+            </div>
+          </div>
+          <div class="lesson-content-pane">
+            <article id="lesson-content" class="markdown card">
+              <div class="empty-note">👈 왼쪽에서 읽고 싶은 레슨을 골라 주세요.</div>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <!-- 💬 채팅 -->
+      <section class="view" id="view-chat">
+        <header class="view-header">
+          <h1>💬 채팅</h1>
+          <p class="view-desc">클로드와 자유롭게 대화해 보세요. 이전 대화도 저장되어 이어갈 수 있어요.</p>
+        </header>
+        <div class="chat-layout">
+          <div class="chat-sessions-pane">
+            <button id="new-chat-btn" class="btn btn-primary btn-block">＋ 새 대화</button>
+            <div id="chat-session-list" class="session-list">
+              <div class="loading-note">대화 목록을 불러오는 중이에요…</div>
+            </div>
+          </div>
+          <div class="chat-main-pane card">
+            <div id="chat-messages" class="chat-messages">
+              <div class="empty-note">새 대화를 시작하거나, 왼쪽에서 이전 대화를 골라 주세요. 😊</div>
+            </div>
+            <div id="chat-error" class="error-box hidden"></div>
+            <div id="chat-thinking" class="thinking-note hidden">
+              🤔 클로드가 생각하고 있어요… <span class="thinking-sub">(몇십 초 걸릴 수 있어요)</span>
+            </div>
+            <form id="chat-form" class="chat-input-row">
+              <textarea id="chat-input" rows="2" placeholder="무엇이든 물어보세요. (Enter로 전송, Shift+Enter로 줄바꿈)"></textarea>
+              <button type="submit" id="chat-send-btn" class="btn btn-primary">보내기</button>
+            </form>
+          </div>
+        </div>
+      </section>
+
+      <!-- 🧭 컴패니언 -->
+      <section class="view" id="view-companion">
+        <header class="view-header">
+          <h1>🧭 컴패니언</h1>
+          <p class="view-desc">진행 중인 Claude Code 작업을 함께 보며 조언해 주고, 보내기 전 요청문도 같이 다듬어 드려요.</p>
+        </header>
+
+        <!-- 조언 받기 -->
+        <div class="companion-section">
+          <h2 class="section-title">📋 작업 세션 보고 조언 받기</h2>
+          <p class="section-desc">최근 Claude Code 작업 목록이에요. 하나를 고르면 클로드가 상황을 읽고 조언해 드려요.</p>
+          <div id="cc-session-list" class="cc-session-list">
+            <div class="loading-note">작업 목록을 불러오는 중이에요…</div>
+          </div>
+          <div id="advise-controls" class="advise-controls hidden">
+            <div class="selected-session-label" id="selected-session-label"></div>
+            <div class="advise-input-row">
+              <input type="text" id="focus-input" placeholder="(선택) 특별히 봐줬으면 하는 부분이 있나요? 예: 지금 막힌 부분" />
+              <button id="advise-btn" class="btn btn-primary">조언 받기</button>
+            </div>
+          </div>
+          <div id="advise-thinking" class="thinking-note hidden">
+            🤔 클로드가 작업 내용을 읽고 있어요… <span class="thinking-sub">(몇십 초 걸릴 수 있어요)</span>
+          </div>
+          <div id="advise-error" class="error-box hidden"></div>
+          <article id="advise-result" class="markdown card hidden"></article>
+        </div>
+
+        <!-- 보내기 전 다듬기 -->
+        <div class="companion-section">
+          <h2 class="section-title">✏️ 보내기 전 다듬기</h2>
+          <p class="section-desc">Claude Code에 보낼 요청문을 미리 적어 보세요. 클로드가 더 명확해지도록 같이 다듬어 드려요.</p>
+          <div class="card refine-card">
+            <div id="refine-messages" class="chat-messages refine-messages">
+              <div class="empty-note">아래에 보내고 싶은 요청문 초안을 적고 '다듬기 시작'을 눌러 주세요.</div>
+            </div>
+            <div id="refine-error" class="error-box hidden"></div>
+            <div id="refine-thinking" class="thinking-note hidden">
+              🤔 클로드가 생각하고 있어요… <span class="thinking-sub">(몇십 초 걸릴 수 있어요)</span>
+            </div>
+            <form id="refine-form" class="chat-input-row">
+              <textarea id="refine-input" rows="3" placeholder="예: 우리 가게 홈페이지를 만들고 싶어요…"></textarea>
+              <div class="refine-btn-col">
+                <button type="submit" id="refine-send-btn" class="btn btn-primary">다듬기 시작</button>
+                <button type="button" id="refine-reset-btn" class="btn btn-ghost hidden">새로 시작</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+  <script src="app.js"></script>
+</body>
+</html>

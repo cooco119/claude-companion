@@ -1,0 +1,20 @@
+{
+  "name": "claude-companion",
+  "version": "0.1.0",
+  "description": "비개발자를 위한 Claude Code 셀프서비스 학습 + 컴패니언 웹앱",
+  "type": "module",
+  "scripts": {
+    "start": "tsx src/server.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.21.0"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.21",
+    "@types/node": "^22.0.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0"
+  }
+}
