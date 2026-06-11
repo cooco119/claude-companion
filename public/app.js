@@ -320,8 +320,12 @@
   // 🧭 컴패니언 — 섹션 점프 미니 내비
   // ============================================================
 
-  document.querySelectorAll('.companion-nav-btn').forEach(function (btn) {
+  var companionNavBtns = document.querySelectorAll('.companion-nav-btn');
+  companionNavBtns.forEach(function (btn) {
     btn.addEventListener('click', function () {
+      // 현재 위치 표시 (active 상태)
+      companionNavBtns.forEach(function (b) { b.classList.remove('active'); });
+      btn.classList.add('active');
       var target = document.getElementById(btn.dataset.target);
       if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
     });
@@ -357,7 +361,13 @@
 
   function scheduleNewsPoll() {
     stopNewsPolling();
-    if (Date.now() >= newsPollDeadline) return; // 최대 5분까지만 폴링
+    if (Date.now() >= newsPollDeadline) {
+      // 최대 5분까지만 폴링 — 마감되면 '가져오는 중' 배너를 무한히 남겨두지 말고 종료 상태로 전환
+      newsRefreshingBannerEl.classList.add('hidden');
+      showError(newsErrorEl,
+        '소식을 가져오는 데 시간이 걸리네요. 잠시 후 이 탭을 다시 열어 확인해 주세요.');
+      return;
+    }
     newsPollTimer = setTimeout(function () {
       newsPollTimer = null;
       if (companionTabActive()) loadNews(true); // 탭을 떠났으면 폴링 중단
@@ -369,12 +379,16 @@
     return typeof url === 'string' && /^https?:\/\//i.test(url);
   }
 
-  function renderNewsItems(items, refreshing) {
+  function renderNewsItems(items, refreshing, lastError) {
     newsListEl.innerHTML = '';
     if (!items || items.length === 0) {
       if (refreshing) {
         newsListEl.appendChild(el('div', 'loading-note',
           '첫 소식을 모으고 있어요. 잠시만 기다려 주세요…'));
+      } else if (lastError) {
+        // 실패를 '소식 없음'과 구분해서 알려준다 (대처법 포함)
+        newsListEl.appendChild(el('div', 'error-box',
+          '소식을 가져오는 데 실패했어요. 😢 인터넷 연결을 확인하고, 잠시 후 이 탭에 다시 들어와 주세요. 그러면 다시 시도해 볼게요.'));
       } else {
         newsListEl.appendChild(el('div', 'empty-note',
           '아직 보여드릴 소식이 없어요. 잠시 후 이 탭에 다시 들어오면 새 소식을 가져와 볼게요. 😊'));
@@ -414,7 +428,7 @@
       } else {
         newsUpdatedAtEl.textContent = '';
       }
-      renderNewsItems(data.items || [], !!data.refreshing);
+      renderNewsItems(data.items || [], !!data.refreshing, data.lastError || null);
       if (data.refreshing) {
         newsRefreshingBannerEl.classList.remove('hidden');
         if (!isPoll) newsPollDeadline = Date.now() + NEWS_POLL_MAX_MS; // 새 갱신 시작 → 5분 타이머 리셋
@@ -422,9 +436,17 @@
       } else {
         newsRefreshingBannerEl.classList.add('hidden');
         stopNewsPolling();
+        // 캐시된 소식은 있는데 갱신만 실패한 경우: 목록은 유지하고 작은 경고만 보여준다
+        if (data.lastError && data.items && data.items.length > 0) {
+          showError(newsErrorEl,
+            '새 소식 갱신에는 실패해서 이전 소식을 보여드리고 있어요. 잠시 후 이 탭에 다시 들어오면 다시 시도해 볼게요.');
+        }
       }
     }).catch(function (err) {
-      newsListEl.innerHTML = '';
+      // 일시적 네트워크 오류로 읽고 있던 목록을 지우지 않는다 — 카드가 없을 때만 비운다
+      if (!newsListEl.querySelector('.news-card')) {
+        newsListEl.innerHTML = '';
+      }
       showError(newsErrorEl, err.message);
       newsRefreshingBannerEl.classList.add('hidden');
       stopNewsPolling();
@@ -594,18 +616,33 @@
 
   // refine 응답의 guidance(모델 추천 + 단계 타임라인)를 reply 아래에 렌더.
   // 모델 출력이므로 전부 textContent로만 넣는다 (innerHTML 금지).
-  function renderGuidance(containerEl, guidance) {
+  // isEstimate가 true면(대화 초반) '추정' 라벨을 붙이고, 새 카드가 올 때마다
+  // 이전 guidance 카드는 흐리게(guidance-stale) 처리해 마지막 카드만 최신임을 보여준다.
+  function renderGuidance(containerEl, guidance, isEstimate) {
     if (!guidance || typeof guidance !== 'object') return;
+
+    // 이전 턴의 guidance 카드들은 흐리게 — 추천이 바뀌어도 서로 모순돼 보이지 않게
+    containerEl.querySelectorAll('.guidance').forEach(function (old) {
+      old.classList.add('guidance-stale');
+    });
+
     var wrap = el('div', 'guidance');
 
     // (a) 모델 추천 카드
     if (guidance.recommendedModel) {
       var modelCard = el('div', 'guidance-model-card');
-      modelCard.appendChild(el('div', 'guidance-model-label', '🤖 이 작업에 추천하는 모델'));
+      modelCard.appendChild(el('div', 'guidance-model-label',
+        isEstimate ? '🤖 지금까지 내용 기준, 추천 모델 (추정이에요)' : '🤖 이 작업에 추천하는 모델'));
       modelCard.appendChild(el('div', 'guidance-model-name', String(guidance.recommendedModel)));
       if (guidance.modelReason) {
         modelCard.appendChild(el('div', 'guidance-model-reason', String(guidance.modelReason)));
       }
+      if (isEstimate) {
+        modelCard.appendChild(el('div', 'guidance-estimate-note',
+          '※ 대화가 진행되면 추천이 바뀔 수 있어요. 아래 대화를 이어가며 더 정확해져요.'));
+      }
+      modelCard.appendChild(el('div', 'guidance-model-howto',
+        '이 모델로 바꾸려면: 터미널의 Claude Code에서 /model 을 입력하고 목록에서 골라 주세요.'));
       wrap.appendChild(modelCard);
     }
 
@@ -650,12 +687,13 @@
     setRefineBusy(true);
 
     var body = { draft: text };
+    var isFirstTurn = !refineSessionId; // 첫 턴의 guidance는 '추정'으로 표시
     if (refineSessionId) body.sessionId = refineSessionId;
 
     apiPost('/api/companion/refine', body).then(function (data) {
       refineSessionId = data.sessionId;
       appendMessage(refineMessagesEl, 'assistant', data.reply);
-      renderGuidance(refineMessagesEl, data.guidance);
+      renderGuidance(refineMessagesEl, data.guidance, isFirstTurn);
       appendCostNote(refineMessagesEl, data.costUsd);
       scrollToBottom(refineMessagesEl);
       refineSendBtn.textContent = '답장 보내기';

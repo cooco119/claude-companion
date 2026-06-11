@@ -119,10 +119,10 @@ export interface RefineResult {
  */
 export function splitGuidance(text: string): { reply: string; guidance?: Guidance } {
   const fenceRe = /```json\s*([\s\S]*?)```/gi;
-  const matches: Array<{ block: string; inner: string }> = [];
+  const matches: Array<{ block: string; inner: string; index: number }> = [];
   let m: RegExpExecArray | null;
   while ((m = fenceRe.exec(text)) !== null) {
-    matches.push({ block: m[0], inner: m[1] });
+    matches.push({ block: m[0], inner: m[1], index: m.index });
   }
   // Guidance는 답변 끝에 붙으므로 마지막 블록부터 검사한다
   for (let i = matches.length - 1; i >= 0; i--) {
@@ -134,7 +134,10 @@ export function splitGuidance(text: string): { reply: string; guidance?: Guidanc
     }
     const guidance = validateGuidance(parsed);
     if (!guidance) continue;
-    const reply = text.replace(matches[i].block, '').trim();
+    // String.replace(문자열 검색)는 항상 '첫' 일치를 지우므로, 본문에 동일한 블록이
+    // 예시로 한 번 더 있으면 엉뚱한 쪽이 지워진다 — 매치 위치(index)로 정확히 잘라낸다.
+    const { block, index } = matches[i];
+    const reply = (text.slice(0, index) + text.slice(index + block.length)).trim();
     return { reply, guidance };
   }
   return { reply: text.trim() };

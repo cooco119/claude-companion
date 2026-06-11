@@ -563,6 +563,18 @@ body {
   color: var(--coral-deep);
 }
 
+/* 현재 위치 표시 (클릭한 섹션) */
+.companion-nav-btn.active {
+  border-color: var(--coral);
+  background: var(--coral-soft);
+  color: var(--coral-deep);
+}
+
+/* sticky 내비에 섹션 제목이 가려지지 않도록 (scrollIntoView 시 내비 높이만큼 여유) */
+.companion-section {
+  scroll-margin-top: 64px;
+}
+
 /* ---------- 컴패니언: 📰 오늘의 클로드 ---------- */
 .news-updated-at {
   font-size: 14px;
@@ -677,6 +689,27 @@ body {
 .guidance-model-reason {
   font-size: 15px;
   color: var(--brown);
+}
+
+/* 첫 턴 등 '추정' 추천임을 알리는 작은 안내 */
+.guidance-estimate-note {
+  font-size: 13px;
+  color: var(--brown-soft);
+  margin-top: 6px;
+}
+
+/* 추천 모델을 실제로 적용하는 방법 안내 (/model) */
+.guidance-model-howto {
+  font-size: 13px;
+  color: var(--brown-soft);
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px dashed var(--cream-deep);
+}
+
+/* 이전 턴의 guidance 카드: 최신 카드만 또렷하게 보이도록 흐리게 */
+.guidance-stale {
+  opacity: 0.45;
 }
 
 /* 단계 타임라인 */

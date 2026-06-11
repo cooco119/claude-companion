@@ -6,8 +6,10 @@
  * - 갱신: claude -p 에 --allowedTools WebSearch 를 붙여 최근 Claude·Claude Code 소식,
  *   좋은 사용 패턴, 새로운 하네스/루프 디자인을 검색·큐레이션 → NewsItem[] 5~8개를
  *   fenced JSON 코드블록으로 출력하게 한다.
- * - 서버는 응답에서 첫 JSON 블록을 관대하게 추출·검증(필수 필드 누락 항목은 버림) 후 저장.
- * - 동시 갱신 방지: 모듈 레벨 in-flight 플래그. 갱신 실패 시 기존 캐시 유지 + 콘솔 경고.
+ * - 서버는 응답에서 JSON 블록을 관대하게 추출·검증(필수 필드 누락 항목은 버림) 후 저장.
+ *   (배열은 답변 끝에 오므로 마지막 ```json 펜스부터 역방향 탐색 — splitGuidance와 동일한 방식)
+ * - 동시 갱신 방지: 모듈 레벨 in-flight 플래그. 갱신 실패 시 기존 캐시 유지 + 콘솔 경고
+ *   + 백오프(FAILURE_BACKOFF_MS) + 응답 lastError로 프런트에 실패 상태 전달.
  */
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
@@ -34,8 +36,29 @@ const CACHE_FILE = path.resolve(
 
 const TTL_MS = 6 * 60 * 60 * 1000; // 6시간
 
+/** 갱신 실패 후 이 시간 동안은 재시도하지 않는다 (10초 폴링이 비싼 WebSearch 호출을 반복 기동하는 것 방지) */
+const FAILURE_BACKOFF_MS = 10 * 60 * 1000; // 10분
+
+/** 다이제스트/캐시 폭주 방지 상한 (companion.ts의 DIGEST_MAX_* 캡핑과 같은 취지) */
+const MAX_ITEMS = 8;
+const MAX_FIELD_CHARS: Record<keyof NewsItem, number> = {
+  title: 200,
+  summary: 1000,
+  whyGood: 300,
+  url: 2000,
+  source: 100,
+};
+
+/** 비정상적으로 긴 모델 출력에서 균형 매칭이 O(n²)로 이벤트 루프를 막지 않도록 스캔 길이 상한 */
+const MAX_SCAN_CHARS = 256 * 1024; // 256KB
+const MAX_BALANCED_ATTEMPTS = 200;
+
 /** 동시 갱신 방지용 in-flight 플래그 (갱신 중 들어온 재요청은 무시) */
 let refreshing = false;
+
+/** negative cache: 마지막 실패 시각/메시지 (백오프 + 프런트 실패 표시용) */
+let lastFailedAt = 0;
+let lastErrorMessage: string | null = null;
 
 // ── 캐시 읽기/쓰기 ─────────────────────────────────────────
 
@@ -83,15 +106,21 @@ export async function getNews(): Promise<{
   items: NewsItem[];
   fetchedAt: string | null;
   refreshing: boolean;
+  lastError: string | null;
 }> {
   const cache = await readCache();
   if (!cache || isStale(cache)) {
-    startBackgroundRefresh();
+    // 직전 갱신이 실패했다면 백오프 시간 동안은 재시도하지 않는다
+    // (프런트의 10초 폴링/탭 재진입이 실패한 WebSearch 호출을 반복 기동하는 것 방지)
+    if (Date.now() - lastFailedAt >= FAILURE_BACKOFF_MS) {
+      startBackgroundRefresh();
+    }
   }
   return {
     items: cache?.items ?? [],
     fetchedAt: cache?.fetchedAt ?? null,
     refreshing,
+    lastError: refreshing ? null : lastErrorMessage,
   };
 }
 
@@ -99,8 +128,14 @@ function startBackgroundRefresh(): void {
   if (refreshing) return; // 이미 갱신 중 → 무시
   refreshing = true;
   void refreshNews()
+    .then(() => {
+      lastFailedAt = 0;
+      lastErrorMessage = null;
+    })
     .catch((err) => {
-      // 실패해도 기존 캐시는 그대로 유지된다 — 콘솔 경고만 남긴다
+      // 실패해도 기존 캐시는 그대로 유지된다 — 백오프 기록 + 콘솔 경고
+      lastFailedAt = Date.now();
+      lastErrorMessage = err instanceof Error && err.message ? err.message : '소식 갱신에 실패했어요.';
       console.warn(
         '[news] 소식 갱신에 실패했어요. 기존 캐시를 그대로 유지합니다.',
         err instanceof Error ? err.message : err
@@ -153,30 +188,53 @@ async function refreshNews(): Promise<void> {
 // ── JSON 관대 추출 (단위 테스트 대상) ─────────────────────
 
 /**
- * 텍스트에서 JSON 값을 관대하게 추출한다.
- * 1) 첫 ```json 펜스 블록을 파싱 시도 (블록 안에 잡담이 섞여 있으면 블록 안에서 균형 매칭)
- * 2) 없거나 실패하면 전체 텍스트에서 첫 { ... } / [ ... ] 균형 매칭을 파싱 시도
- * 실패하면 undefined (throw 금지).
+ * 텍스트에서 JSON 값 후보들을 관대하게 추출한다.
+ * 1) 모든 ```json 펜스 블록을 수집해 **마지막 블록부터** 파싱 시도
+ *    (프롬프트가 "답변 마지막에" 배열을 요구하고, 본문에 항목 모양 예시 객체가 섞일 수 있으므로 —
+ *    splitGuidance()와 같은 역방향 탐색)
+ * 2) 펜스에서 후보가 안 나오면 전체 텍스트에서 { ... } / [ ... ] 균형 매칭을 파싱 시도
+ * 후보가 없으면 빈 배열 (throw 금지).
  */
-export function extractFirstJson(text: string): unknown {
-  const fence = /```json\s*([\s\S]*?)```/i.exec(text);
-  if (fence) {
-    const inner = fence[1].trim();
+export function extractJsonCandidates(text: string): unknown[] {
+  const candidates: unknown[] = [];
+  const fenceRe = /```json\s*([\s\S]*?)```/gi;
+  const fences: string[] = [];
+  let m: RegExpExecArray | null;
+  while ((m = fenceRe.exec(text)) !== null) {
+    fences.push(m[1].trim());
+  }
+  // 진짜 데이터는 답변 끝에 붙으므로 마지막 펜스부터 검사한다
+  for (let i = fences.length - 1; i >= 0; i--) {
     try {
-      return JSON.parse(inner);
+      candidates.push(JSON.parse(fences[i]));
     } catch {
-      const fromFence = extractBalanced(inner);
-      if (fromFence !== undefined) return fromFence;
+      const fromFence = extractBalanced(fences[i]);
+      if (fromFence !== undefined) candidates.push(fromFence);
     }
   }
-  return extractBalanced(text);
+  const fromText = extractBalanced(text);
+  if (fromText !== undefined) candidates.push(fromText);
+  return candidates;
 }
 
-/** 문자열/이스케이프를 고려해 첫 균형 잡힌 JSON 값({...} 또는 [...])을 찾아 파싱 */
+/** (호환용) 첫 후보 하나만 돌려준다. 실패하면 undefined. */
+export function extractFirstJson(text: string): unknown {
+  const candidates = extractJsonCandidates(text);
+  return candidates.length > 0 ? candidates[0] : undefined;
+}
+
+/**
+ * 문자열/이스케이프를 고려해 첫 균형 잡힌 JSON 값({...} 또는 [...])을 찾아 파싱.
+ * 비정상적으로 긴 출력에서 O(n²) 재스캔으로 이벤트 루프를 막지 않도록
+ * 스캔 길이(MAX_SCAN_CHARS)와 시도 횟수(MAX_BALANCED_ATTEMPTS)에 상한을 둔다.
+ */
 function extractBalanced(text: string): unknown {
+  if (text.length > MAX_SCAN_CHARS) text = text.slice(0, MAX_SCAN_CHARS);
+  let attempts = 0;
   for (let i = 0; i < text.length; i++) {
     const ch = text[i];
     if (ch !== '{' && ch !== '[') continue;
+    if (++attempts > MAX_BALANCED_ATTEMPTS) return undefined;
     const end = scanBalancedEnd(text, i);
     if (end === null) continue;
     try {
@@ -213,29 +271,38 @@ function scanBalancedEnd(text: string, start: number): number | null {
 
 /**
  * 응답 텍스트에서 NewsItem[]을 추출한다.
+ * 모든 JSON 후보(마지막 펜스부터)를 검사해 유효한 NewsItem이 1개 이상 나오는
+ * 첫 후보를 채택한다 — 본문에 항목 모양 예시 객체가 섞여 있어도 진짜 배열로 폴백된다.
  * 필수 필드(title, summary, whyGood, url, source)가 하나라도 빠진 항목은 버린다.
  */
 export function extractNewsItems(text: string): NewsItem[] {
-  const value = extractFirstJson(text);
-  let list: unknown[];
-  if (Array.isArray(value)) {
-    list = value;
-  } else if (
-    value &&
-    typeof value === 'object' &&
-    Array.isArray((value as Record<string, unknown>).items)
-  ) {
-    list = (value as Record<string, unknown>).items as unknown[];
-  } else {
-    return [];
+  for (const value of extractJsonCandidates(text)) {
+    let list: unknown[];
+    if (Array.isArray(value)) {
+      list = value;
+    } else if (
+      value &&
+      typeof value === 'object' &&
+      Array.isArray((value as Record<string, unknown>).items)
+    ) {
+      list = (value as Record<string, unknown>).items as unknown[];
+    } else {
+      continue;
+    }
+    const items = coerceNewsItems(list);
+    if (items.length > 0) return items;
   }
-  return coerceNewsItems(list);
+  return [];
 }
 
-/** 항목 배열을 검증해 유효한 NewsItem만 남긴다 (여분 필드는 제거) */
+/**
+ * 항목 배열을 검증해 유효한 NewsItem만 남긴다 (여분 필드는 제거).
+ * 다이제스트/캐시 폭주 방지: 최대 MAX_ITEMS개, 필드별 길이 상한(MAX_FIELD_CHARS) 적용.
+ */
 function coerceNewsItems(list: unknown[]): NewsItem[] {
   const items: NewsItem[] = [];
   for (const raw of list) {
+    if (items.length >= MAX_ITEMS) break; // 프롬프트는 5~8개를 '요청'할 뿐 — 여기서 강제
     if (!raw || typeof raw !== 'object' || Array.isArray(raw)) continue;
     const obj = raw as Record<string, unknown>;
     const title = nonEmptyString(obj.title);
@@ -244,9 +311,20 @@ function coerceNewsItems(list: unknown[]): NewsItem[] {
     const url = nonEmptyString(obj.url);
     const source = nonEmptyString(obj.source);
     if (!title || !summary || !whyGood || !url || !source) continue; // 필수 필드 누락 → 버림
-    items.push({ title, summary, whyGood, url, source });
+    items.push({
+      title: capField(title, 'title'),
+      summary: capField(summary, 'summary'),
+      whyGood: capField(whyGood, 'whyGood'),
+      url: capField(url, 'url'),
+      source: capField(source, 'source'),
+    });
   }
   return items;
+}
+
+function capField(value: string, field: keyof NewsItem): string {
+  const max = MAX_FIELD_CHARS[field];
+  return value.length > max ? value.slice(0, max) : value;
 }
 
 function nonEmptyString(v: unknown): string | null {
