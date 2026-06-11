@@ -2,6 +2,7 @@
  * server.ts — Express 앱 조립 (ARCHITECTURE.md의 HTTP API 표 전부)
  */
 import express, { type Request, type Response } from 'express';
+import { spawn } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -187,8 +188,34 @@ app.use('/api', (_req: Request, res: Response) => {
   res.status(404).json({ error: '존재하지 않는 API 경로예요.' });
 });
 
+/**
+ * 기본 브라우저로 주소를 연다 (OS별 분기, 실패해도 서버는 계속 동작).
+ * NO_OPEN=1 이면 열지 않는다 (테스트/서버 환경용).
+ */
+function openBrowser(url: string): void {
+  if (process.env.NO_OPEN) return;
+  const [cmd, args] =
+    process.platform === 'darwin'
+      ? ['open', [url]]
+      : process.platform === 'win32'
+        ? ['cmd', ['/c', 'start', '', url]]
+        : ['xdg-open', [url]];
+  try {
+    const child = spawn(cmd, args, { stdio: 'ignore', detached: true });
+    child.on('error', () => {
+      console.log('   (브라우저가 자동으로 열리지 않으면 위 주소를 직접 열어 주세요)');
+    });
+    child.unref();
+  } catch {
+    // 브라우저를 못 열어도 서버는 정상 — 주소는 이미 콘솔에 안내됨
+  }
+}
+
 const server = app.listen(PORT, () => {
-  console.log(`http://localhost:${PORT} 에서 실행 중`);
+  const url = `http://localhost:${PORT}`;
+  console.log(`${url} 에서 실행 중`);
+  console.log('잠시 후 브라우저가 자동으로 열려요. 안 열리면 위 주소를 브라우저에 직접 입력해 주세요.');
+  openBrowser(url);
 });
 
 // 포트 충돌 등 listen 실패를 영어 스택트레이스 대신 한국어 안내로 보여준다.
