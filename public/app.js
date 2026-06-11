@@ -110,7 +110,12 @@
       $('#view-' + btn.dataset.tab).classList.add('active');
       if (btn.dataset.tab === 'learn') loadLessons();
       if (btn.dataset.tab === 'chat') loadChatSessions();
-      if (btn.dataset.tab === 'companion') loadCcSessions();
+      if (btn.dataset.tab === 'companion') {
+        loadCcSessions();
+        loadNews(false); // 탭 진입 시마다 소식 갱신 확인
+      } else {
+        stopNewsPolling(); // 컴패니언 탭을 떠나면 폴링 중단
+      }
     });
   });
 
@@ -312,6 +317,181 @@
   });
 
   // ============================================================
+  // 🧭 컴패니언 — 섹션 점프 미니 내비
+  // ============================================================
+
+  document.querySelectorAll('.companion-nav-btn').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var target = document.getElementById(btn.dataset.target);
+      if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  });
+
+  // ============================================================
+  // 🧭 컴패니언 — 📰 오늘의 클로드 (뉴스)
+  // ============================================================
+
+  var NEWS_POLL_INTERVAL_MS = 10 * 1000;      // 10초 간격
+  var NEWS_POLL_MAX_MS = 5 * 60 * 1000;       // 최대 5분
+
+  var newsListEl = $('#news-list');
+  var newsErrorEl = $('#news-error');
+  var newsRefreshingBannerEl = $('#news-refreshing-banner');
+  var newsUpdatedAtEl = $('#news-updated-at');
+
+  var newsLoading = false;
+  var newsPollTimer = null;
+  var newsPollDeadline = 0;
+
+  function companionTabActive() {
+    var view = $('#view-companion');
+    return !!view && view.classList.contains('active');
+  }
+
+  function stopNewsPolling() {
+    if (newsPollTimer) {
+      clearTimeout(newsPollTimer);
+      newsPollTimer = null;
+    }
+  }
+
+  function scheduleNewsPoll() {
+    stopNewsPolling();
+    if (Date.now() >= newsPollDeadline) return; // 최대 5분까지만 폴링
+    newsPollTimer = setTimeout(function () {
+      newsPollTimer = null;
+      if (companionTabActive()) loadNews(true); // 탭을 떠났으면 폴링 중단
+    }, NEWS_POLL_INTERVAL_MS);
+  }
+
+  // 출처 링크는 http(s)만 허용 (그 외 스킴은 링크 미표시)
+  function isSafeHttpUrl(url) {
+    return typeof url === 'string' && /^https?:\/\//i.test(url);
+  }
+
+  function renderNewsItems(items, refreshing) {
+    newsListEl.innerHTML = '';
+    if (!items || items.length === 0) {
+      if (refreshing) {
+        newsListEl.appendChild(el('div', 'loading-note',
+          '첫 소식을 모으고 있어요. 잠시만 기다려 주세요…'));
+      } else {
+        newsListEl.appendChild(el('div', 'empty-note',
+          '아직 보여드릴 소식이 없어요. 잠시 후 이 탭에 다시 들어오면 새 소식을 가져와 볼게요. 😊'));
+      }
+      return;
+    }
+    items.forEach(function (item) {
+      var card = el('article', 'news-card');
+      if (item.source) card.appendChild(el('div', 'news-card-source', String(item.source)));
+      card.appendChild(el('h3', 'news-card-title', String(item.title || '(제목 없음)')));
+      if (item.summary) card.appendChild(el('p', 'news-card-summary', String(item.summary)));
+      if (item.whyGood) {
+        var why = el('div', 'news-why');
+        why.appendChild(el('span', 'news-why-emoji', '💡'));
+        why.appendChild(el('span', 'news-why-text', String(item.whyGood)));
+        card.appendChild(why);
+      }
+      if (isSafeHttpUrl(item.url)) {
+        var link = el('a', 'news-card-link', '출처 보기 ↗');
+        link.href = item.url;
+        link.target = '_blank';
+        link.rel = 'noopener noreferrer';
+        card.appendChild(link);
+      }
+      newsListEl.appendChild(card);
+    });
+  }
+
+  function loadNews(isPoll) {
+    if (newsLoading) return;
+    newsLoading = true;
+    hideError(newsErrorEl);
+    api('/api/companion/news').then(function (data) {
+      if (data.fetchedAt) {
+        var ago = timeAgo(data.fetchedAt);
+        newsUpdatedAtEl.textContent = ago ? '(' + ago + ' 업데이트)' : '';
+      } else {
+        newsUpdatedAtEl.textContent = '';
+      }
+      renderNewsItems(data.items || [], !!data.refreshing);
+      if (data.refreshing) {
+        newsRefreshingBannerEl.classList.remove('hidden');
+        if (!isPoll) newsPollDeadline = Date.now() + NEWS_POLL_MAX_MS; // 새 갱신 시작 → 5분 타이머 리셋
+        scheduleNewsPoll();
+      } else {
+        newsRefreshingBannerEl.classList.add('hidden');
+        stopNewsPolling();
+      }
+    }).catch(function (err) {
+      newsListEl.innerHTML = '';
+      showError(newsErrorEl, err.message);
+      newsRefreshingBannerEl.classList.add('hidden');
+      stopNewsPolling();
+    }).finally(function () {
+      newsLoading = false;
+    });
+  }
+
+  // ---------- 소식에 대해 물어보기 (news/ask) ----------
+
+  var newsAskSessionId = null;
+  var newsAskBusy = false;
+
+  var newsAskMessagesEl = $('#news-ask-messages');
+  var newsAskErrorEl = $('#news-ask-error');
+  var newsAskThinkingEl = $('#news-ask-thinking');
+  var newsAskInputEl = $('#news-ask-input');
+  var newsAskSendBtn = $('#news-ask-send-btn');
+
+  function setNewsAskBusy(busy) {
+    newsAskBusy = busy;
+    newsAskSendBtn.disabled = busy;
+    newsAskThinkingEl.classList.toggle('hidden', !busy);
+  }
+
+  function sendNewsAsk() {
+    var text = newsAskInputEl.value.trim();
+    if (!text || newsAskBusy) return;
+    hideError(newsAskErrorEl);
+
+    var note = newsAskMessagesEl.querySelector('.empty-note');
+    if (note) note.remove();
+
+    appendMessage(newsAskMessagesEl, 'user', text);
+    scrollToBottom(newsAskMessagesEl);
+    newsAskInputEl.value = '';
+    setNewsAskBusy(true);
+
+    var body = { question: text };
+    if (newsAskSessionId) body.sessionId = newsAskSessionId;
+
+    apiPost('/api/companion/news/ask', body).then(function (data) {
+      newsAskSessionId = data.sessionId;
+      appendMessage(newsAskMessagesEl, 'assistant', data.reply); // marked+DOMPurify 경유
+      appendCostNote(newsAskMessagesEl, data.costUsd);
+      scrollToBottom(newsAskMessagesEl);
+    }).catch(function (err) {
+      showError(newsAskErrorEl, err.message);
+    }).finally(function () {
+      setNewsAskBusy(false);
+      newsAskInputEl.focus();
+    });
+  }
+
+  $('#news-ask-form').addEventListener('submit', function (e) {
+    e.preventDefault();
+    sendNewsAsk();
+  });
+
+  newsAskInputEl.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
+      e.preventDefault();
+      sendNewsAsk();
+    }
+  });
+
+  // ============================================================
   // 🧭 컴패니언 — 조언 받기
   // ============================================================
 
@@ -405,6 +585,57 @@
     refineThinkingEl.classList.toggle('hidden', !busy);
   }
 
+  // guidance 단계 배지: mode → 라벨/색상 클래스 (모르는 mode는 배지 생략)
+  var GUIDANCE_MODE_BADGES = {
+    plan: { text: '🗺️ 플래닝 먼저', cls: 'badge-plan' },
+    execute: { text: '⚡ 바로 실행', cls: 'badge-execute' },
+    checkpoint: { text: '✋ 확인 후 진행', cls: 'badge-checkpoint' }
+  };
+
+  // refine 응답의 guidance(모델 추천 + 단계 타임라인)를 reply 아래에 렌더.
+  // 모델 출력이므로 전부 textContent로만 넣는다 (innerHTML 금지).
+  function renderGuidance(containerEl, guidance) {
+    if (!guidance || typeof guidance !== 'object') return;
+    var wrap = el('div', 'guidance');
+
+    // (a) 모델 추천 카드
+    if (guidance.recommendedModel) {
+      var modelCard = el('div', 'guidance-model-card');
+      modelCard.appendChild(el('div', 'guidance-model-label', '🤖 이 작업에 추천하는 모델'));
+      modelCard.appendChild(el('div', 'guidance-model-name', String(guidance.recommendedModel)));
+      if (guidance.modelReason) {
+        modelCard.appendChild(el('div', 'guidance-model-reason', String(guidance.modelReason)));
+      }
+      wrap.appendChild(modelCard);
+    }
+
+    // (b) 단계 타임라인
+    var steps = Array.isArray(guidance.steps) ? guidance.steps : [];
+    if (steps.length > 0) {
+      var stepsBox = el('div', 'guidance-steps');
+      stepsBox.appendChild(el('div', 'guidance-steps-title', '🪜 이런 순서로 진행해 보세요'));
+      var timeline = el('ol', 'guidance-timeline');
+      steps.forEach(function (step, i) {
+        if (!step || typeof step !== 'object') return;
+        var li = el('li', 'guidance-step');
+        li.appendChild(el('span', 'guidance-step-num', String(i + 1)));
+        var bodyEl = el('div', 'guidance-step-body');
+        var head = el('div', 'guidance-step-head');
+        head.appendChild(el('span', 'guidance-step-label', String(step.label || '')));
+        var badge = GUIDANCE_MODE_BADGES[step.mode];
+        if (badge) head.appendChild(el('span', 'guidance-badge ' + badge.cls, badge.text));
+        bodyEl.appendChild(head);
+        if (step.note) bodyEl.appendChild(el('div', 'guidance-step-note', String(step.note)));
+        li.appendChild(bodyEl);
+        timeline.appendChild(li);
+      });
+      stepsBox.appendChild(timeline);
+      wrap.appendChild(stepsBox);
+    }
+
+    if (wrap.childNodes.length > 0) containerEl.appendChild(wrap);
+  }
+
   function sendRefine() {
     var text = refineInputEl.value.trim();
     if (!text || refineBusy) return;
@@ -424,6 +655,7 @@
     apiPost('/api/companion/refine', body).then(function (data) {
       refineSessionId = data.sessionId;
       appendMessage(refineMessagesEl, 'assistant', data.reply);
+      renderGuidance(refineMessagesEl, data.guidance);
       appendCostNote(refineMessagesEl, data.costUsd);
       scrollToBottom(refineMessagesEl);
       refineSendBtn.textContent = '답장 보내기';

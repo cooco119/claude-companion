@@ -2,3 +2,4 @@ node_modules/
 data/sessions.json
 nohup.out
 *.log
+data/news.json

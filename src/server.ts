@@ -10,6 +10,7 @@ import { isClaudeCliAvailable, runClaude, ClaudeError } from './claude.js';
 import * as store from './store.js';
 import { listCcSessions } from './ccSessions.js';
 import { advise, refineTurn } from './companion.js';
+import { getNews, askNewsTurn } from './news.js';
 import { listLessons, getLesson } from './lessons.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -175,7 +176,57 @@ app.post('/api/companion/refine', async (req: Request, res: Response) => {
     }
 
     const result = await refineTurn(draft, session.claudeSessionId);
-    await store.appendTurn(session.id, draft, result.text, result.sessionId);
+    // 앱 세션에는 Guidance JSON이 제거된 깨끗한 본문을 저장한다
+    await store.appendTurn(session.id, draft, result.reply, result.sessionId);
+
+    res.json({
+      reply: result.reply,
+      sessionId: session.id,
+      costUsd: result.costUsd,
+      ...(result.guidance ? { guidance: result.guidance } : {}),
+    });
+  } catch (err) {
+    sendError(res, err);
+  }
+});
+
+// ── 컴패니언: 오늘의 클로드 (소식) ────────────────────────
+app.get('/api/companion/news', async (_req: Request, res: Response) => {
+  try {
+    // 캐시 즉시 반환 — 없거나 6시간 지났으면 백그라운드 갱신 시작 후 refreshing:true
+    const news = await getNews();
+    res.json(news);
+  } catch (err) {
+    sendError(res, err);
+  }
+});
+
+// ── 컴패니언: 소식 Q&A ────────────────────────────────────
+app.post('/api/companion/news/ask', async (req: Request, res: Response) => {
+  try {
+    const { question, sessionId } = (req.body ?? {}) as {
+      question?: unknown;
+      sessionId?: unknown;
+    };
+    if (typeof question !== 'string' || question.trim() === '') {
+      res.status(400).json({ error: '궁금한 점을 입력해 주세요.' });
+      return;
+    }
+
+    let session: store.ChatSession | null = null;
+    if (typeof sessionId === 'string' && sessionId !== '') {
+      session = await store.getSession(sessionId);
+      if (!session) {
+        res.status(404).json({ error: '해당 소식 Q&A 세션을 찾을 수 없어요.' });
+        return;
+      }
+    }
+    if (!session) {
+      session = await store.createSession(question, '[소식] ');
+    }
+
+    const result = await askNewsTurn(question, session.claudeSessionId);
+    await store.appendTurn(session.id, question, result.text, result.sessionId);
 
     res.json({ reply: result.text, sessionId: session.id, costUsd: result.costUsd });
   } catch (err) {

@@ -8,8 +8,15 @@
  * - refine: 바로 고쳐 쓰지 말고 모호한 점을 1–2개 묻고, 충분히 명확해지면 최종 요청문을
  *   코드블록으로 제안하는 코치. --resume으로 연속 대화.
  */
-import { runClaude, type ClaudeResult } from './claude.js';
+import { runClaude } from './claude.js';
 import { parseTranscript, type TranscriptMessage } from './ccSessions.js';
+
+/** 다듬기 대화마다 함께 내려가는 안내 카드 데이터 (ARCHITECTURE.md의 Guidance) */
+export type Guidance = {
+  recommendedModel: string; // 'Haiku 4.5' | 'Sonnet 4.6' | 'Opus 4.8' | 'Fable 5'
+  modelReason: string; // 한 줄, 비개발자 언어
+  steps: Array<{ label: string; mode: 'plan' | 'execute' | 'checkpoint'; note?: string }>;
+};
 
 const DIGEST_MAX_MESSAGES = 30;
 const DIGEST_MAX_CHARS = 8000;
@@ -73,7 +80,91 @@ const REFINE_SYSTEM = [
   '- 요청문을 바로 고쳐 쓰지 마세요. 먼저 모호한 점을 1–2개만 물어보세요.',
   '- 대화를 통해 충분히 명확해지면, 그때 최종 요청문을 코드블록으로 제안하세요.',
   '- 말투는 코딩을 모르는 비개발자도 편한, 친절하고 짧은 한국어로.',
+  '',
+  '추가 규칙 — 매 턴(이번 답변 포함, 이후 모든 답변에서도) 답변 맨 끝에 아래 형식의 Guidance',
+  '객체 하나를 ```json 펜스 코드블록으로 꼭 출력하세요. 작업이 아직 모호하더라도 현재까지의',
+  '추정치로라도 출력해야 합니다. 형식:',
+  '```json',
+  '{',
+  '  "recommendedModel": "Haiku 4.5 | Sonnet 4.6 | Opus 4.8 | Fable 5 중 하나",',
+  '  "modelReason": "비개발자 언어로 한 줄 이유",',
+  '  "steps": [',
+  '    { "label": "단계 이름", "mode": "plan | execute | checkpoint", "note": "선택 메모" }',
+  '  ]',
+  '}',
+  '```',
+  '모델 추천은 다음 기준(triage 매트릭스)을 따르세요:',
+  '- 경로가 정해진 짧은 일 → Sonnet 4.6 (아주 단순 반복 → Haiku 4.5)',
+  '- 경로가 열린 짧은 일 → Sonnet 4.6 (막히면 Opus 4.8)',
+  '- 경로가 정해진 긴 일 → Opus 4.8',
+  '- 경로도 길이도 열린 긴 일 → Fable 5',
+  'steps는 2~5개로 하고, 각 단계의 mode 의미:',
+  "- 'plan': 플래닝 먼저 (🗺️ 실행 전에 계획부터 세우는 게 안전한 단계)",
+  "- 'execute': 바로 실행 (⚡ 그냥 시키면 되는 단계)",
+  "- 'checkpoint': 확인 후 진행 (✋ 결과를 사람이 확인하고 넘어가야 하는 단계)",
 ].join('\n');
+
+/** refineTurn의 결과: 본문(reply)에서 Guidance JSON 블록을 떼어낸 깨끗한 응답 */
+export interface RefineResult {
+  reply: string;
+  guidance?: Guidance;
+  sessionId: string | null;
+  costUsd: number;
+}
+
+/**
+ * 응답 텍스트에서 Guidance JSON 블록을 추출·검증하고 본문에서 제거한다.
+ * - ```json 펜스 블록 중 Guidance처럼 생긴 것(뒤에서부터 탐색)을 찾는다.
+ * - 파싱/검증에 실패하면 guidance 없이 원문 그대로 돌려준다 (throw 금지).
+ */
+export function splitGuidance(text: string): { reply: string; guidance?: Guidance } {
+  const fenceRe = /```json\s*([\s\S]*?)```/gi;
+  const matches: Array<{ block: string; inner: string }> = [];
+  let m: RegExpExecArray | null;
+  while ((m = fenceRe.exec(text)) !== null) {
+    matches.push({ block: m[0], inner: m[1] });
+  }
+  // Guidance는 답변 끝에 붙으므로 마지막 블록부터 검사한다
+  for (let i = matches.length - 1; i >= 0; i--) {
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(matches[i].inner.trim());
+    } catch {
+      continue;
+    }
+    const guidance = validateGuidance(parsed);
+    if (!guidance) continue;
+    const reply = text.replace(matches[i].block, '').trim();
+    return { reply, guidance };
+  }
+  return { reply: text.trim() };
+}
+
+/** Guidance 형태 검증. steps[].mode가 plan/execute/checkpoint 외 값이면 그 step은 버린다. */
+function validateGuidance(value: unknown): Guidance | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  const obj = value as Record<string, unknown>;
+  if (typeof obj.recommendedModel !== 'string' || obj.recommendedModel.trim() === '') return null;
+  if (typeof obj.modelReason !== 'string' || obj.modelReason.trim() === '') return null;
+  if (!Array.isArray(obj.steps)) return null;
+
+  const steps: Guidance['steps'] = [];
+  for (const raw of obj.steps) {
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) continue;
+    const s = raw as Record<string, unknown>;
+    if (typeof s.label !== 'string' || s.label.trim() === '') continue;
+    const mode = s.mode;
+    if (mode !== 'plan' && mode !== 'execute' && mode !== 'checkpoint') continue; // 계약 외 mode → 버림
+    const step: Guidance['steps'][number] = { label: s.label.trim(), mode };
+    if (typeof s.note === 'string' && s.note.trim() !== '') step.note = s.note.trim();
+    steps.push(step);
+  }
+  return {
+    recommendedModel: obj.recommendedModel.trim(),
+    modelReason: obj.modelReason.trim(),
+    steps,
+  };
+}
 
 /**
  * 보내기 전 요청문 다듬기 한 턴.
@@ -82,19 +173,22 @@ const REFINE_SYSTEM = [
 export async function refineTurn(
   draft: string,
   resumeClaudeSessionId: string | null
-): Promise<ClaudeResult> {
-  if (resumeClaudeSessionId) {
-    return runClaude(draft, { resumeSessionId: resumeClaudeSessionId });
-  }
-  const prompt = [
-    REFINE_SYSTEM,
-    '',
-    '사용자가 Claude Code에 보내려는 요청문 초안:',
-    '"""',
-    draft,
-    '"""',
-    '',
-    '위 규칙대로 다듬기를 시작해 주세요.',
-  ].join('\n');
-  return runClaude(prompt);
+): Promise<RefineResult> {
+  const result = resumeClaudeSessionId
+    ? await runClaude(draft, { resumeSessionId: resumeClaudeSessionId })
+    : await runClaude(
+        [
+          REFINE_SYSTEM,
+          '',
+          '사용자가 Claude Code에 보내려는 요청문 초안:',
+          '"""',
+          draft,
+          '"""',
+          '',
+          '위 규칙대로 다듬기를 시작해 주세요.',
+        ].join('\n')
+      );
+  // Guidance JSON 블록을 본문에서 떼어낸다 (reply에는 JSON이 남지 않게)
+  const { reply, guidance } = splitGuidance(result.text);
+  return { reply, guidance, sessionId: result.sessionId, costUsd: result.costUsd };
 }

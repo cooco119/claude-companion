@@ -39,6 +39,11 @@ export function isClaudeCliAvailable(): Promise<boolean> {
 interface RunOptions {
   /** 이전 대화를 이어갈 claude session_id */
   resumeSessionId?: string | null;
+  /**
+   * CLI에 그대로 덧붙일 추가 인자 (예: ['--allowedTools', 'WebSearch']).
+   * 기존 호출부는 옵션을 주지 않아도 동작이 그대로다.
+   */
+  extraArgs?: string[];
 }
 
 /**
@@ -56,6 +61,9 @@ export function runClaude(prompt: string, options: RunOptions = {}): Promise<Cla
   const model = process.env.CLAUDE_MODEL;
   if (model && model.trim() !== '') {
     args.push('--model', model.trim());
+  }
+  if (options.extraArgs && options.extraArgs.length > 0) {
+    args.push(...options.extraArgs);
   }
 
   return new Promise<ClaudeResult>((resolve, reject) => {

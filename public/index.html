@@ -93,8 +93,47 @@
           <p class="view-desc">진행 중인 Claude Code 작업을 함께 보며 조언해 주고, 보내기 전 요청문도 같이 다듬어 드려요.</p>
         </header>
 
+        <!-- 섹션 점프 미니 내비 -->
+        <nav class="companion-nav" aria-label="컴패니언 섹션 이동">
+          <button type="button" class="companion-nav-btn" data-target="companion-news">📰 소식</button>
+          <button type="button" class="companion-nav-btn" data-target="companion-advise">📋 조언</button>
+          <button type="button" class="companion-nav-btn" data-target="companion-refine">✏️ 다듬기</button>
+        </nav>
+
+        <!-- 📰 오늘의 클로드 -->
+        <div class="companion-section" id="companion-news">
+          <h2 class="section-title">📰 오늘의 클로드</h2>
+          <p class="section-desc">
+            Claude와 Claude Code의 최근 소식을 골라 왔어요.
+            <span id="news-updated-at" class="news-updated-at"></span>
+          </p>
+          <div id="news-refreshing-banner" class="thinking-note hidden">
+            🔄 새 소식 가져오는 중… <span class="thinking-sub">(1~2분 걸릴 수 있어요)</span>
+          </div>
+          <div id="news-error" class="error-box hidden"></div>
+          <div id="news-list" class="news-list">
+            <div class="loading-note">소식을 불러오는 중이에요…</div>
+          </div>
+
+          <!-- 소식에 대해 물어보기 -->
+          <div class="card news-ask-card">
+            <h3 class="news-ask-title">💬 소식에 대해 물어보기</h3>
+            <div id="news-ask-messages" class="chat-messages news-ask-messages">
+              <div class="empty-note">궁금한 소식이 있으면 물어보세요. 예: "이 기능은 나한테 어떻게 도움이 돼요?"</div>
+            </div>
+            <div id="news-ask-error" class="error-box hidden"></div>
+            <div id="news-ask-thinking" class="thinking-note hidden">
+              🤔 클로드가 생각하고 있어요… <span class="thinking-sub">(몇십 초 걸릴 수 있어요)</span>
+            </div>
+            <form id="news-ask-form" class="chat-input-row">
+              <textarea id="news-ask-input" rows="2" placeholder="소식에 대해 궁금한 점을 적어 보세요. (Enter로 전송, Shift+Enter로 줄바꿈)"></textarea>
+              <button type="submit" id="news-ask-send-btn" class="btn btn-primary">물어보기</button>
+            </form>
+          </div>
+        </div>
+
         <!-- 조언 받기 -->
-        <div class="companion-section">
+        <div class="companion-section" id="companion-advise">
           <h2 class="section-title">📋 작업 세션 보고 조언 받기</h2>
           <p class="section-desc">최근 Claude Code 작업 목록이에요. 하나를 고르면 클로드가 상황을 읽고 조언해 드려요.</p>
           <div id="cc-session-list" class="cc-session-list">
@@ -115,7 +154,7 @@
         </div>
 
         <!-- 보내기 전 다듬기 -->
-        <div class="companion-section">
+        <div class="companion-section" id="companion-refine">
           <h2 class="section-title">✏️ 보내기 전 다듬기</h2>
           <p class="section-desc">Claude Code에 보낼 요청문을 미리 적어 보세요. 클로드가 더 명확해지도록 같이 다듬어 드려요.</p>
           <div class="card refine-card">

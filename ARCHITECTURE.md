@@ -65,7 +65,45 @@ type ChatSession = {
 | `GET /api/lessons/:slug` | - | `{ slug, title, markdown }` |
 | `GET /api/cc-sessions` | - | `{ sessions: Array<{path /* 절대경로 */, project, file, mtime, preview}> }` |
 | `POST /api/companion/advise` | `{ transcriptPath: string, focus?: string }` | `{ advice: string, costUsd: number }` — 세션을 읽고 조언+다른 관점+구체화 질문 |
-| `POST /api/companion/refine` | `{ draft: string, sessionId?: string }` | `{ reply: string, sessionId: string, costUsd: number }` — 보내기 전 다듬기 대화 (앱 세션으로 저장, title 앞에 `[다듬기] `) |
+| `POST /api/companion/refine` | `{ draft: string, sessionId?: string }` | `{ reply: string, sessionId: string, costUsd: number, guidance?: Guidance }` — 보내기 전 다듬기 대화 (앱 세션으로 저장, title 앞에 `[다듬기] `) |
+| `GET /api/companion/news` | - | `{ items: NewsItem[], fetchedAt: string \| null, refreshing: boolean }` — 캐시 즉시 반환; 캐시가 없거나 6시간 지났으면 백그라운드 갱신 시작 후 `refreshing:true` |
+| `POST /api/companion/news/ask` | `{ question: string, sessionId?: string }` | `{ reply: string, sessionId: string, costUsd: number }` — 소식 다이제스트를 컨텍스트로 한 Q&A (`--resume` 연속, 앱 세션 title 앞 `[소식] `) |
+
+```ts
+type NewsItem = {
+  title: string;       // 한국어 제목 (원문이 영어면 번역)
+  summary: string;     // 2-3문장 한국어 요약
+  whyGood: string;     // "이게 왜 좋은가/나에게 무슨 의미인가" 한 줄
+  url: string;         // 출처 링크
+  source: string;      // 예: 'Anthropic 블로그', 'Claude Docs', 'Hacker News', 'X(@karpathy)'
+};
+type Guidance = {
+  recommendedModel: string;            // 'Haiku 4.5' | 'Sonnet 4.6' | 'Opus 4.8' | 'Fable 5'
+  modelReason: string;                 // 한 줄, 비개발자 언어
+  steps: Array<{ label: string; mode: 'plan' | 'execute' | 'checkpoint'; note?: string }>;
+};
+```
+
+### 뉴스 캐시/갱신 (src/news.ts)
+
+- 캐시: `data/news.json` = `{ fetchedAt: ISO, items: NewsItem[] }`. TTL 6시간.
+- 갱신: `claude -p` 호출에 `--allowedTools WebSearch` 를 붙여 (claude.ts에 extraArgs 옵션 추가)
+  Claude 공식 docs 변경/Anthropic 블로그/X의 @karpathy/Hacker News 등에서 **최근 Claude·
+  Claude Code 소식, 좋은 사용 패턴, 새로운 하네스/루프 디자인**을 검색·큐레이션해 NewsItem[]
+  5~8개를 **fenced JSON 코드블록**으로 출력하게 한다. 서버는 응답에서 첫 JSON 블록을 관대하게
+  추출·검증(필수 필드 누락 항목은 버림)하고 캐시에 저장.
+- 동시 갱신 방지: 모듈 레벨 in-flight 플래그 (갱신 중 재요청은 무시). 갱신 실패 시 기존 캐시 유지.
+
+### 다듬기 guidance (src/companion.ts 확장)
+
+refine 시스템 지시에 추가: 매 턴 답변 끝에 ```json 펜스로 Guidance 객체를 출력하게 한다 —
+작업이 아직 모호하면 현재 추정치로라도. 서버는 이 블록을 **본문에서 떼어내** `guidance` 필드로
+반환한다(reply에는 JSON이 남지 않게). 모델 추천은 fablicator triage 매트릭스를 따른다:
+  - 경로가 정해진 짧은 일 → Sonnet 4.6 (아주 단순 반복 → Haiku 4.5)
+  - 경로가 열린 짧은 일 → Sonnet 4.6 (막히면 Opus 4.8)
+  - 경로가 정해진 긴 일 → Opus 4.8
+  - 경로도 길이도 열린 긴 일 → Fable 5
+steps는 2~5개, 각각 mode: 'plan'(플래닝 먼저 🗺️) / 'execute'(바로 실행 ⚡) / 'checkpoint'(확인 후 진행 ✋).
 
 에러는 모두 `{ error: string }` (한국어) + 적절한 status.
 
@@ -84,8 +122,12 @@ refine: "사용자가 Claude Code에 보낼 요청문을 같이 다듬는 코치
 - 좌측 사이드바 탭 3개: **🎓 배우기 / 💬 채팅 / 🧭 컴패니언**
 - 배우기: 레슨 목록 → 클릭 시 marked로 렌더
 - 채팅: 세션 목록 + 새 채팅, 메시지 전송 중 "생각 중…" 표시 (응답이 수십 초 걸릴 수 있음을 UI에 명시)
-- 컴패니언: (a) CC 세션 목록에서 선택 → "조언 받기" (+선택적 focus 입력), (b) "보내기 전 다듬기"
-  텍스트영역 → 대화형으로 다듬기
+- 컴패니언: 위에서부터 ③개 섹션 — (a) **📰 오늘의 클로드**: 접속 시 GET news 즉시 렌더
+  (refreshing이면 "새 소식 가져오는 중…" 표시 후 폴링 10초 간격 최대 5분), 카드마다
+  제목/요약/whyGood/출처 링크, 아래 소식 Q&A 입력(news/ask, sessionId 유지). (b) CC 세션 목록에서
+  선택 → "조언 받기" (+선택적 focus 입력), (c) "보내기 전 다듬기" 텍스트영역 → 대화형 다듬기.
+  guidance가 오면 **모델 추천 카드**(모델명 크게 + 이유)와 **단계 타임라인**(번호 + 배지: 🗺️ 플래닝
+  먼저 / ⚡ 바로 실행 / ✋ 확인 후 진행)을 reply 아래에 렌더.
 - 디자인: 따뜻하고 단순하게. 시스템 폰트, 큰 글자, 버튼에 라벨 명확히. 다크모드 불필요.
 
 ## 파일 소유권 (병렬 빌드 충돌 방지)
