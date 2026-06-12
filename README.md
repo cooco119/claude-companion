@@ -8,9 +8,15 @@
 
 ## 시작하기 3단계
 
-### ① Claude 설치하고 로그인하기
+### ① 기본 설정 — 가입, Claude Code 설치, 로그인
 
-먼저 AI 비서인 Claude Code를 컴퓨터에 설치해야 해요. 처음이라면 아래 가이드를 그대로 따라 하시면 됩니다. '터미널이 뭐예요?'부터 시작하니 걱정 마세요.
+먼저 AI 비서인 Claude Code를 쓸 수 있는 상태로 만들어야 해요. 크게 세 가지입니다.
+
+1. **가입** — [claude.ai](https://claude.ai) 에서 Claude 계정을 만들어요 (구글 계정이나 이메일이면 충분해요). Claude Code를 쓰려면 유료 구독(Pro 또는 Max)이 필요합니다.
+2. **설치** — Node.js를 설치한 뒤, 터미널에서 `npm install -g @anthropic-ai/claude-code` 한 줄로 Claude Code를 설치해요.
+3. **로그인** — 터미널에서 `claude` 를 실행하면 브라우저가 열리며 로그인을 안내해 줘요. 한 번만 하면 컴퓨터가 기억합니다.
+
+처음이라면 아래 가이드를 그대로 따라 하시면 됩니다. '터미널이 뭐예요?'부터 시작하니 걱정 마세요.
 
 👉 [docs/getting-started.md — 처음부터 끝까지 따라하는 설치 가이드](docs/getting-started.md)
 
@@ -63,7 +69,21 @@ http://localhost:3456
 |---|---|
 | 🎓 **배우기** | 비개발자 눈높이로 쓴 한국어 레슨을 차례대로 읽는 곳이에요. "클로드 코드가 뭐예요?"부터 시작합니다. |
 | 💬 **채팅** | Claude와 자유롭게 대화하는 곳이에요. 대화는 자동으로 저장되어 나중에 이어서 할 수 있습니다. 답이 수십 초 걸릴 수 있으니 "생각 중…"이 떠 있으면 잠시 기다려 주세요. |
-| 🧭 **컴패니언** | 진행 중인 Claude Code 작업을 보고 조언이나 다른 관점을 들려주고, AI에게 보낼 요청문을 보내기 전에 같이 다듬어 주는 코치입니다. |
+| 🧭 **컴패니언** | 최신 Claude 소식을 보여주고, 진행 중인 Claude Code 작업에 조언이나 다른 관점을 들려주고, AI에게 보낼 요청문을 보내기 전에 같이 다듬어 주는 코치입니다. |
+
+실제 화면은 이렇게 생겼어요.
+
+**🎓 배우기** — 레슨을 클릭해서 읽어요.
+
+<img src="assets/screenshots/learn-lesson.png" alt="배우기 탭 — 레슨 '클로드 코드가 뭐예요?'를 읽는 화면" width="720">
+
+**💬 채팅** — 평범한 메신저처럼 대화해요.
+
+<img src="assets/screenshots/chat.png" alt="채팅 탭 — 대화 목록과 입력창" width="720">
+
+**🧭 컴패니언** — 오늘의 클로드 소식, 조언, 보내기 전 다듬기.
+
+<img src="assets/screenshots/companion.png" alt="컴패니언 탭 — 오늘의 클로드 소식 카드" width="720">
 
 ## 문제 해결 FAQ
 
@@ -78,6 +98,38 @@ AI 비서인 Claude Code가 아직 설치되지 않았거나 로그인이 안 �
 **Q3. `npm start`를 했더니 "포트가 이미 사용 중"이라는 비슷한 에러가 나요.**
 
 이미 앱이 한 번 켜져 있는 상태일 수 있어요. 먼저 브라우저에서 `http://localhost:3456` 을 열어 보세요. 이미 잘 열린다면 그대로 쓰시면 됩니다. 그래도 문제가 있다면 컴퓨터를 한 번 재시작한 뒤 `npm start`를 다시 실행해 보세요.
+
+## 🤖 에이전트(AI)용 설치 가이드
+
+> 이 절은 사람이 아니라 **AI 에이전트**(Claude Code 등)를 위한 것입니다. 사용자가 "이 앱 설치해줘"라고 시켰다면 아래를 그대로 따라 하세요. 사람이라면 위의 [시작하기 3단계](#시작하기-3단계)를 보시면 됩니다.
+
+<!-- For agents: follow these steps verbatim. Each step includes its expected output for verification. -->
+
+```bash
+# 0. 사전 조건 확인
+node --version    # v20 이상이어야 함. 없으면: 사용자에게 https://nodejs.org LTS 설치를 안내
+git --version     # 없으면: OS에 맞게 git 설치 (macOS: xcode-select --install / Windows: git-scm.com)
+claude --version  # 없으면: npm install -g @anthropic-ai/claude-code
+                  # 설치 후 로그인이 안 돼 있으면 사용자가 직접 `claude`를 실행해
+                  # 브라우저 인증을 마치도록 안내해야 함 (에이전트가 대신 로그인할 수 없음)
+
+# 1. 내려받기 + 설치
+git clone https://github.com/cooco119/claude-companion.git
+cd claude-companion
+npm install       # 취약점 0, express + tsx + typescript 설치됨
+
+# 2. 실행 (NO_OPEN=1 은 headless 환경에서 브라우저 자동 열기를 끔)
+NO_OPEN=1 npm start &   # 데스크톱 환경이면 NO_OPEN 없이 실행 — 브라우저가 자동으로 열림
+
+# 3. 검증 (모두 통과해야 설치 성공)
+curl -s http://localhost:3456/api/health
+# 기대값: {"ok":true,"claudeCli":true}
+#   claudeCli:false 면 → claude CLI 미설치/미로그인. 0번으로 돌아갈 것.
+curl -s http://localhost:3456/api/lessons
+# 기대값: lessons 배열 11개 (order 1~11)
+```
+
+검증까지 끝나면 사용자에게 **브라우저에서 `http://localhost:3456` 을 열라고 안내**하고, 첫 방문이라면 🎓 배우기 탭의 첫 레슨부터 읽기를 권하세요. 포트가 사용 중이면 `PORT=다른번호 npm start` 로 바꿔 실행하면 됩니다 (안내하는 주소도 같은 번호로).
 
 ## 라이선스
 
