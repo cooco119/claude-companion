@@ -6,12 +6,13 @@ import { spawn } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { isClaudeCliAvailable, runClaude, ClaudeError } from './claude.js';
+import { isClaudeCliAvailable, ClaudeError } from './claude.js';
 import * as store from './store.js';
 import { listCcSessions } from './ccSessions.js';
-import { advise, refineTurn } from './companion.js';
-import { getNews, askNewsTurn } from './news.js';
+import { advise, refineTurn, feedback } from './companion.js';
+import { getNews } from './news.js';
 import { listLessons, getLesson } from './lessons.js';
+import { askTurn, coerceAskContext } from './tutor.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const PORT = Number(process.env.PORT) || 3456;
@@ -39,34 +40,39 @@ app.get('/api/health', async (_req: Request, res: Response) => {
   res.json({ ok: true, claudeCli });
 });
 
-// ── 채팅 ──────────────────────────────────────────────────
-app.post('/api/chat', async (req: Request, res: Response) => {
+// ── ❓ 물어보기 (튜터) ─────────────────────────────────────
+app.post('/api/ask', async (req: Request, res: Response) => {
   try {
-    const { message, sessionId } = (req.body ?? {}) as {
-      message?: unknown;
+    const { question, context, quote, sessionId } = (req.body ?? {}) as {
+      question?: unknown;
+      context?: unknown;
+      quote?: unknown;
       sessionId?: unknown;
     };
-    if (typeof message !== 'string' || message.trim() === '') {
-      res.status(400).json({ error: '메시지를 입력해 주세요.' });
+    if (typeof question !== 'string' || question.trim() === '') {
+      res.status(400).json({ error: '궁금한 점을 입력해 주세요.' });
       return;
     }
+    // context/quote는 선택 — 형태가 안 맞으면 조용히 무시한다
+    const askContext = coerceAskContext(context);
+    const askQuote =
+      typeof quote === 'string' && quote.trim() !== '' ? quote : undefined;
 
     let session: store.ChatSession | null = null;
     if (typeof sessionId === 'string' && sessionId !== '') {
       session = await store.getSession(sessionId);
       if (!session) {
-        res.status(404).json({ error: '해당 채팅 세션을 찾을 수 없어요.' });
+        res.status(404).json({ error: '해당 물어보기 세션을 찾을 수 없어요.' });
         return;
       }
     }
     if (!session) {
-      session = await store.createSession(message);
+      session = await store.createSession(question, '[물어보기] ');
     }
 
-    const result = await runClaude(message, {
-      resumeSessionId: session.claudeSessionId,
-    });
-    await store.appendTurn(session.id, message, result.text, result.sessionId);
+    const result = await askTurn(question, askContext, askQuote, session.claudeSessionId);
+    // 앱 세션에는 컨텍스트 블록이 섞이지 않은 질문 원문과 깨끗한 답변을 저장한다
+    await store.appendTurn(session.id, question, result.text, result.sessionId);
 
     res.json({ reply: result.text, sessionId: session.id, costUsd: result.costUsd });
   } catch (err) {
@@ -201,34 +207,16 @@ app.get('/api/companion/news', async (_req: Request, res: Response) => {
   }
 });
 
-// ── 컴패니언: 소식 Q&A ────────────────────────────────────
-app.post('/api/companion/news/ask', async (req: Request, res: Response) => {
+// ── 컴패니언: 피드백 리포트 ───────────────────────────────
+app.post('/api/companion/feedback', async (req: Request, res: Response) => {
   try {
-    const { question, sessionId } = (req.body ?? {}) as {
-      question?: unknown;
-      sessionId?: unknown;
-    };
-    if (typeof question !== 'string' || question.trim() === '') {
-      res.status(400).json({ error: '궁금한 점을 입력해 주세요.' });
+    const { transcriptPath } = (req.body ?? {}) as { transcriptPath?: unknown };
+    if (typeof transcriptPath !== 'string' || transcriptPath.trim() === '') {
+      res.status(400).json({ error: '피드백을 받을 세션을 선택해 주세요.' });
       return;
     }
-
-    let session: store.ChatSession | null = null;
-    if (typeof sessionId === 'string' && sessionId !== '') {
-      session = await store.getSession(sessionId);
-      if (!session) {
-        res.status(404).json({ error: '해당 소식 Q&A 세션을 찾을 수 없어요.' });
-        return;
-      }
-    }
-    if (!session) {
-      session = await store.createSession(question, '[소식] ');
-    }
-
-    const result = await askNewsTurn(question, session.claudeSessionId);
-    await store.appendTurn(session.id, question, result.text, result.sessionId);
-
-    res.json({ reply: result.text, sessionId: session.id, costUsd: result.costUsd });
+    const result = await feedback(transcriptPath);
+    res.json({ report: result.report, costUsd: result.costUsd });
   } catch (err) {
     sendError(res, err);
   }

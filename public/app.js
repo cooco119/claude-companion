@@ -1,4 +1,4 @@
-/* 클로드 컴패니언 — 프런트 (vanilla JS, 빌드 없음) */
+/* 클로드 컴패니언 — 프런트 (vanilla JS, 빌드 없음) — v0.2 IA */
 (function () {
   'use strict';
 
@@ -99,7 +99,24 @@
     boxEl.classList.add('hidden');
   }
 
+  function appendMessage(containerEl, role, text) {
+    var msg = el('div', 'msg ' + (role === 'user' ? 'msg-user' : 'msg-assistant'));
+    if (role === 'user') {
+      msg.textContent = text;
+    } else {
+      renderMarkdown(msg, text);
+    }
+    containerEl.appendChild(msg);
+    return msg;
+  }
+
+  function scrollToBottom(containerEl) {
+    containerEl.scrollTop = containerEl.scrollHeight;
+  }
+
   // ---------- 탭 전환 ----------
+
+  var currentTab = 'learn'; // 'learn' | 'news' | 'companion'
 
   var tabButtons = document.querySelectorAll('.tab-btn');
   tabButtons.forEach(function (btn) {
@@ -108,13 +125,14 @@
       btn.classList.add('active');
       document.querySelectorAll('.view').forEach(function (v) { v.classList.remove('active'); });
       $('#view-' + btn.dataset.tab).classList.add('active');
-      if (btn.dataset.tab === 'learn') loadLessons();
-      if (btn.dataset.tab === 'chat') loadChatSessions();
-      if (btn.dataset.tab === 'companion') {
-        loadCcSessions();
+      currentTab = btn.dataset.tab;
+      hideSelectionChip();
+      if (currentTab === 'learn') loadLessons();
+      if (currentTab === 'companion') loadCcSessions();
+      if (currentTab === 'news') {
         loadNews(false); // 탭 진입 시마다 소식 갱신 확인
       } else {
-        stopNewsPolling(); // 컴패니언 탭을 떠나면 폴링 중단
+        stopNewsPolling(); // 새 소식 탭을 떠나면 폴링 중단
       }
     });
   });
@@ -137,6 +155,7 @@
   // ============================================================
 
   var lessonsLoaded = false;
+  var currentLessonTitle = null; // 물어보기 컨텍스트용
 
   function loadLessons() {
     if (lessonsLoaded) return;
@@ -175,6 +194,7 @@
     contentEl.innerHTML = '';
     contentEl.appendChild(el('div', 'loading-note', '레슨을 불러오는 중이에요…'));
     api('/api/lessons/' + encodeURIComponent(slug)).then(function (data) {
+      currentLessonTitle = data.title || null;
       renderMarkdown(contentEl, data.markdown);
       contentEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }).catch(function (err) {
@@ -184,155 +204,7 @@
   }
 
   // ============================================================
-  // 💬 채팅
-  // ============================================================
-
-  var currentChatSessionId = null;
-  var chatBusy = false;
-
-  var chatMessagesEl = $('#chat-messages');
-  var chatErrorEl = $('#chat-error');
-  var chatThinkingEl = $('#chat-thinking');
-  var chatInputEl = $('#chat-input');
-  var chatSendBtn = $('#chat-send-btn');
-
-  function loadChatSessions() {
-    var listEl = $('#chat-session-list');
-    api('/api/sessions').then(function (data) {
-      listEl.innerHTML = '';
-      var sessions = data.sessions || [];
-      if (sessions.length === 0) {
-        listEl.appendChild(el('div', 'empty-note', '아직 저장된 대화가 없어요.'));
-        return;
-      }
-      sessions.forEach(function (s) {
-        var btn = el('button', 'session-item');
-        if (s.id === currentChatSessionId) btn.classList.add('active');
-        btn.appendChild(el('div', 'session-item-title', s.title || '(제목 없음)'));
-        btn.appendChild(el('div', 'session-item-meta',
-          timeAgo(s.updatedAt) + ' · 메시지 ' + s.messageCount + '개'));
-        btn.addEventListener('click', function () { openChatSession(s.id); });
-        listEl.appendChild(btn);
-      });
-    }).catch(function (err) {
-      listEl.innerHTML = '';
-      listEl.appendChild(el('div', 'error-box', err.message));
-    });
-  }
-
-  function openChatSession(id) {
-    if (chatBusy) return;
-    hideError(chatErrorEl);
-    chatMessagesEl.innerHTML = '';
-    chatMessagesEl.appendChild(el('div', 'loading-note', '대화를 불러오는 중이에요…'));
-    api('/api/sessions/' + encodeURIComponent(id)).then(function (session) {
-      currentChatSessionId = session.id;
-      chatMessagesEl.innerHTML = '';
-      (session.messages || []).forEach(function (m) {
-        appendMessage(chatMessagesEl, m.role, m.text);
-      });
-      scrollToBottom(chatMessagesEl);
-      loadChatSessions(); // active 표시 갱신
-    }).catch(function (err) {
-      chatMessagesEl.innerHTML = '';
-      showError(chatErrorEl, err.message);
-    });
-  }
-
-  function appendMessage(containerEl, role, text) {
-    var msg = el('div', 'msg ' + (role === 'user' ? 'msg-user' : 'msg-assistant'));
-    if (role === 'user') {
-      msg.textContent = text;
-    } else {
-      renderMarkdown(msg, text);
-    }
-    containerEl.appendChild(msg);
-    return msg;
-  }
-
-  function scrollToBottom(containerEl) {
-    containerEl.scrollTop = containerEl.scrollHeight;
-  }
-
-  $('#new-chat-btn').addEventListener('click', function () {
-    if (chatBusy) return;
-    currentChatSessionId = null;
-    hideError(chatErrorEl);
-    chatMessagesEl.innerHTML = '';
-    chatMessagesEl.appendChild(el('div', 'empty-note',
-      '새 대화예요. 아래에 첫 메시지를 적어 보세요. 😊'));
-    document.querySelectorAll('#chat-session-list .session-item').forEach(function (b) {
-      b.classList.remove('active');
-    });
-    chatInputEl.focus();
-  });
-
-  function setChatBusy(busy) {
-    chatBusy = busy;
-    chatSendBtn.disabled = busy;
-    chatThinkingEl.classList.toggle('hidden', !busy);
-  }
-
-  function sendChat() {
-    var text = chatInputEl.value.trim();
-    if (!text || chatBusy) return;
-    hideError(chatErrorEl);
-
-    // 첫 메시지면 안내문 제거
-    var note = chatMessagesEl.querySelector('.empty-note');
-    if (note) note.remove();
-
-    appendMessage(chatMessagesEl, 'user', text);
-    scrollToBottom(chatMessagesEl);
-    chatInputEl.value = '';
-    setChatBusy(true);
-
-    var body = { message: text };
-    if (currentChatSessionId) body.sessionId = currentChatSessionId;
-
-    apiPost('/api/chat', body).then(function (data) {
-      currentChatSessionId = data.sessionId;
-      appendMessage(chatMessagesEl, 'assistant', data.reply);
-      appendCostNote(chatMessagesEl, data.costUsd);
-      scrollToBottom(chatMessagesEl);
-      loadChatSessions();
-    }).catch(function (err) {
-      showError(chatErrorEl, err.message);
-    }).finally(function () {
-      setChatBusy(false);
-      chatInputEl.focus();
-    });
-  }
-
-  $('#chat-form').addEventListener('submit', function (e) {
-    e.preventDefault();
-    sendChat();
-  });
-
-  chatInputEl.addEventListener('keydown', function (e) {
-    if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
-      e.preventDefault();
-      sendChat();
-    }
-  });
-
-  // ============================================================
-  // 🧭 컴패니언 — 섹션 점프 미니 내비
-  // ============================================================
-
-  var companionNavBtns = document.querySelectorAll('.companion-nav-btn');
-  companionNavBtns.forEach(function (btn) {
-    btn.addEventListener('click', function () {
-      // 현재 위치 표시 (active 상태)
-      companionNavBtns.forEach(function (b) { b.classList.remove('active'); });
-      btn.classList.add('active');
-      var target = document.getElementById(btn.dataset.target);
-      if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    });
-  });
-
-  // ============================================================
-  // 🧭 컴패니언 — 📰 오늘의 클로드 (뉴스)
+  // 📰 새 소식 (독립 탭)
   // ============================================================
 
   var NEWS_POLL_INTERVAL_MS = 10 * 1000;      // 10초 간격
@@ -346,9 +218,10 @@
   var newsLoading = false;
   var newsPollTimer = null;
   var newsPollDeadline = 0;
+  var lastNewsItems = []; // 물어보기 컨텍스트용
 
-  function companionTabActive() {
-    var view = $('#view-companion');
+  function newsTabActive() {
+    var view = $('#view-news');
     return !!view && view.classList.contains('active');
   }
 
@@ -370,7 +243,7 @@
     }
     newsPollTimer = setTimeout(function () {
       newsPollTimer = null;
-      if (companionTabActive()) loadNews(true); // 탭을 떠났으면 폴링 중단
+      if (newsTabActive()) loadNews(true); // 탭을 떠났으면 폴링 중단
     }, NEWS_POLL_INTERVAL_MS);
   }
 
@@ -428,7 +301,8 @@
       } else {
         newsUpdatedAtEl.textContent = '';
       }
-      renderNewsItems(data.items || [], !!data.refreshing, data.lastError || null);
+      lastNewsItems = data.items || [];
+      renderNewsItems(lastNewsItems, !!data.refreshing, data.lastError || null);
       if (data.refreshing) {
         newsRefreshingBannerEl.classList.remove('hidden');
         if (!isPoll) newsPollDeadline = Date.now() + NEWS_POLL_MAX_MS; // 새 갱신 시작 → 5분 타이머 리셋
@@ -455,75 +329,21 @@
     });
   }
 
-  // ---------- 소식에 대해 물어보기 (news/ask) ----------
-
-  var newsAskSessionId = null;
-  var newsAskBusy = false;
-
-  var newsAskMessagesEl = $('#news-ask-messages');
-  var newsAskErrorEl = $('#news-ask-error');
-  var newsAskThinkingEl = $('#news-ask-thinking');
-  var newsAskInputEl = $('#news-ask-input');
-  var newsAskSendBtn = $('#news-ask-send-btn');
-
-  function setNewsAskBusy(busy) {
-    newsAskBusy = busy;
-    newsAskSendBtn.disabled = busy;
-    newsAskThinkingEl.classList.toggle('hidden', !busy);
-  }
-
-  function sendNewsAsk() {
-    var text = newsAskInputEl.value.trim();
-    if (!text || newsAskBusy) return;
-    hideError(newsAskErrorEl);
-
-    var note = newsAskMessagesEl.querySelector('.empty-note');
-    if (note) note.remove();
-
-    appendMessage(newsAskMessagesEl, 'user', text);
-    scrollToBottom(newsAskMessagesEl);
-    newsAskInputEl.value = '';
-    setNewsAskBusy(true);
-
-    var body = { question: text };
-    if (newsAskSessionId) body.sessionId = newsAskSessionId;
-
-    apiPost('/api/companion/news/ask', body).then(function (data) {
-      newsAskSessionId = data.sessionId;
-      appendMessage(newsAskMessagesEl, 'assistant', data.reply); // marked+DOMPurify 경유
-      appendCostNote(newsAskMessagesEl, data.costUsd);
-      scrollToBottom(newsAskMessagesEl);
-    }).catch(function (err) {
-      showError(newsAskErrorEl, err.message);
-    }).finally(function () {
-      setNewsAskBusy(false);
-      newsAskInputEl.focus();
-    });
-  }
-
-  $('#news-ask-form').addEventListener('submit', function (e) {
-    e.preventDefault();
-    sendNewsAsk();
-  });
-
-  newsAskInputEl.addEventListener('keydown', function (e) {
-    if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
-      e.preventDefault();
-      sendNewsAsk();
-    }
-  });
-
   // ============================================================
-  // 🧭 컴패니언 — 조언 받기
+  // 🧭 컴패니언 — (좌) 진행 중인 작업: 조언 / 피드백 리포트
   // ============================================================
 
   var selectedCcSession = null;
+  var workBusy = false; // 조언/피드백 중복 호출 방지
 
   var adviseControlsEl = $('#advise-controls');
   var adviseThinkingEl = $('#advise-thinking');
+  var feedbackThinkingEl = $('#feedback-thinking');
   var adviseErrorEl = $('#advise-error');
   var adviseResultEl = $('#advise-result');
+  var feedbackResultEl = $('#feedback-result');
   var adviseBtn = $('#advise-btn');
+  var feedbackBtn = $('#feedback-btn');
   var ccListLoaded = false;
 
   function loadCcSessions() {
@@ -554,6 +374,7 @@
             '선택한 작업: ' + (projectName || '') + ' — ' + (s.preview || '').slice(0, 60);
           adviseControlsEl.classList.remove('hidden');
           adviseResultEl.classList.add('hidden');
+          feedbackResultEl.classList.add('hidden');
           hideError(adviseErrorEl);
         });
         listEl.appendChild(btn);
@@ -564,11 +385,17 @@
     });
   }
 
+  function setWorkBusy(busy) {
+    workBusy = busy;
+    adviseBtn.disabled = busy;
+    feedbackBtn.disabled = busy;
+  }
+
   adviseBtn.addEventListener('click', function () {
-    if (!selectedCcSession) return;
+    if (!selectedCcSession || workBusy) return;
     hideError(adviseErrorEl);
     adviseResultEl.classList.add('hidden');
-    adviseBtn.disabled = true;
+    setWorkBusy(true);
     adviseThinkingEl.classList.remove('hidden');
 
     var body = { transcriptPath: selectedCcSession.path };
@@ -582,17 +409,38 @@
     }).catch(function (err) {
       showError(adviseErrorEl, err.message);
     }).finally(function () {
-      adviseBtn.disabled = false;
+      setWorkBusy(false);
       adviseThinkingEl.classList.add('hidden');
     });
   });
 
+  feedbackBtn.addEventListener('click', function () {
+    if (!selectedCcSession || workBusy) return;
+    hideError(adviseErrorEl);
+    feedbackResultEl.classList.add('hidden');
+    setWorkBusy(true);
+    feedbackThinkingEl.classList.remove('hidden');
+
+    apiPost('/api/companion/feedback', { transcriptPath: selectedCcSession.path }).then(function (data) {
+      renderMarkdown(feedbackResultEl, data.report);
+      appendCostNote(feedbackResultEl, data.costUsd);
+      feedbackResultEl.classList.remove('hidden');
+    }).catch(function (err) {
+      showError(adviseErrorEl, err.message);
+    }).finally(function () {
+      setWorkBusy(false);
+      feedbackThinkingEl.classList.add('hidden');
+    });
+  });
+
   // ============================================================
-  // 🧭 컴패니언 — 보내기 전 다듬기
+  // 🧭 컴패니언 — (우) 보내기 전 다듬기
   // ============================================================
 
   var refineSessionId = null;
   var refineBusy = false;
+  var lastRefineDraft = null;  // 물어보기 컨텍스트용
+  var lastRefineReply = null;  // 물어보기 컨텍스트용
 
   var refineMessagesEl = $('#refine-messages');
   var refineErrorEl = $('#refine-error');
@@ -689,9 +537,11 @@
     var body = { draft: text };
     var isFirstTurn = !refineSessionId; // 첫 턴의 guidance는 '추정'으로 표시
     if (refineSessionId) body.sessionId = refineSessionId;
+    if (isFirstTurn) lastRefineDraft = text;
 
     apiPost('/api/companion/refine', body).then(function (data) {
       refineSessionId = data.sessionId;
+      lastRefineReply = data.reply || null;
       appendMessage(refineMessagesEl, 'assistant', data.reply);
       renderGuidance(refineMessagesEl, data.guidance, isFirstTurn);
       appendCostNote(refineMessagesEl, data.costUsd);
@@ -722,6 +572,8 @@
   refineResetBtn.addEventListener('click', function () {
     if (refineBusy) return;
     refineSessionId = null;
+    lastRefineDraft = null;
+    lastRefineReply = null;
     hideError(refineErrorEl);
     refineMessagesEl.innerHTML = '';
     refineMessagesEl.appendChild(el('div', 'empty-note',
@@ -730,6 +582,296 @@
     refineResetBtn.classList.add('hidden');
     refineInputEl.placeholder = '예: 우리 가게 홈페이지를 만들고 싶어요…';
     refineInputEl.focus();
+  });
+
+  // ============================================================
+  // ❓ 물어보기 — FAB + 슬라이드 패널 (POST /api/ask)
+  // ============================================================
+
+  var CONTEXT_MAX_CHARS = 4000; // 클라이언트에서도 4000자 절단 (서버와 동일 한도)
+
+  var askFab = $('#ask-fab');
+  var askOverlayEl = $('#ask-overlay');
+  var askPanelEl = $('#ask-panel');
+  var askCloseBtn = $('#ask-close-btn');
+  var askNewBtn = $('#ask-new-btn');
+  var askMessagesEl = $('#ask-messages');
+  var askErrorEl = $('#ask-error');
+  var askThinkingEl = $('#ask-thinking');
+  var askInputEl = $('#ask-input');
+  var askSendBtn = $('#ask-send-btn');
+  var askFormEl = $('#ask-form');
+  var askContextChipEl = $('#ask-context-chip');
+  var askContextChipTextEl = $('#ask-context-chip-text');
+  var askContextRemoveBtn = $('#ask-context-remove');
+  var askQuoteBoxEl = $('#ask-quote-box');
+  var askQuoteTextEl = $('#ask-quote-text');
+  var askQuoteRemoveBtn = $('#ask-quote-remove');
+
+  var askSessionId = null;
+  var askBusy = false;
+  var askContext = null;     // AskContext | null — 패널 열 때마다 새로 수집
+  var pendingQuote = null;   // 드래그 질문으로 들어온 인용 텍스트
+  var askPanelOpen = false;
+
+  // 현재 탭에서 "지금 보고 계신 것"을 AskContext로 수집한다. 볼 게 없으면 null.
+  function collectAskContext() {
+    var source, title, text;
+    if (currentTab === 'learn') {
+      source = '배우기';
+      var contentEl = $('#lesson-content');
+      var bodyText = contentEl ? (contentEl.textContent || '').trim() : '';
+      if (!currentLessonTitle || !bodyText) return null;
+      title = currentLessonTitle;
+      text = bodyText;
+    } else if (currentTab === 'news') {
+      source = '새 소식';
+      if (!lastNewsItems || lastNewsItems.length === 0) return null;
+      title = '최근 소식 ' + lastNewsItems.length + '건';
+      text = lastNewsItems.map(function (item) {
+        var line = String(item.title || '');
+        if (item.summary) line += ' — ' + String(item.summary);
+        return '· ' + line;
+      }).join('\n');
+    } else if (currentTab === 'companion') {
+      source = '컴패니언';
+      var parts = [];
+      if (selectedCcSession) {
+        title = humanizeProject(selectedCcSession.project) || undefined;
+        parts.push('선택한 Claude Code 작업: ' + (humanizeProject(selectedCcSession.project) || '') +
+          ' — ' + (selectedCcSession.preview || ''));
+      }
+      if (lastRefineDraft) parts.push('다듬는 중인 요청문 초안: ' + lastRefineDraft);
+      if (lastRefineReply) parts.push('다듬기 코치의 마지막 답변: ' + lastRefineReply);
+      if (parts.length === 0) return null;
+      text = parts.join('\n\n');
+    } else {
+      return null;
+    }
+    var ctx = { source: source, text: String(text).slice(0, CONTEXT_MAX_CHARS) };
+    if (title) ctx.title = title;
+    return ctx;
+  }
+
+  function renderContextChip() {
+    if (askContext) {
+      askContextChipTextEl.textContent =
+        askContext.source + (askContext.title ? ' · ' + askContext.title : '');
+      askContextChipEl.classList.remove('hidden');
+    } else {
+      askContextChipEl.classList.add('hidden');
+    }
+  }
+
+  function setQuote(quoteText) {
+    pendingQuote = quoteText || null;
+    if (pendingQuote) {
+      askQuoteTextEl.textContent = pendingQuote; // 사용자 선택 텍스트 — textContent로만
+      askQuoteBoxEl.classList.remove('hidden');
+    } else {
+      askQuoteTextEl.textContent = '';
+      askQuoteBoxEl.classList.add('hidden');
+    }
+  }
+
+  function openAskPanel(quoteText) {
+    hideSelectionChip();
+    // 열 때마다 현재 화면 기준으로 컨텍스트를 새로 수집 (×로 제외했어도 다시 열면 재수집)
+    askContext = collectAskContext();
+    renderContextChip();
+    if (quoteText) setQuote(quoteText);
+    askPanelOpen = true;
+    askOverlayEl.classList.remove('hidden');
+    askPanelEl.classList.add('open');
+    askPanelEl.setAttribute('aria-hidden', 'false');
+    askInputEl.focus();
+  }
+
+  function closeAskPanel() {
+    askPanelOpen = false;
+    askOverlayEl.classList.add('hidden');
+    askPanelEl.classList.remove('open');
+    askPanelEl.setAttribute('aria-hidden', 'true');
+  }
+
+  askFab.addEventListener('click', function () {
+    if (askPanelOpen) closeAskPanel();
+    else openAskPanel(null);
+  });
+
+  askCloseBtn.addEventListener('click', closeAskPanel);
+  askOverlayEl.addEventListener('click', closeAskPanel); // 바깥 클릭으로 닫기
+
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && askPanelOpen) closeAskPanel();
+  });
+
+  askContextRemoveBtn.addEventListener('click', function () {
+    askContext = null; // 이번 패널 세션에서는 컨텍스트 제외
+    renderContextChip();
+  });
+
+  askQuoteRemoveBtn.addEventListener('click', function () {
+    setQuote(null);
+  });
+
+  askNewBtn.addEventListener('click', function () {
+    if (askBusy) return;
+    askSessionId = null;
+    setQuote(null);
+    hideError(askErrorEl);
+    askMessagesEl.innerHTML = '';
+    askMessagesEl.appendChild(el('div', 'empty-note',
+      '새 대화예요. 궁금한 점을 적어 보세요. 😊'));
+    askContext = collectAskContext(); // 새 대화 시작 시 컨텍스트도 새로 수집
+    renderContextChip();
+    askInputEl.focus();
+  });
+
+  function setAskBusy(busy) {
+    askBusy = busy;
+    askSendBtn.disabled = busy;
+    askThinkingEl.classList.toggle('hidden', !busy);
+  }
+
+  function sendAsk() {
+    var text = askInputEl.value.trim();
+    if (!text || askBusy) return;
+    hideError(askErrorEl);
+
+    var note = askMessagesEl.querySelector('.empty-note');
+    if (note) note.remove();
+
+    // 인용이 있으면 사용자 말풍선 위에 인용 블록으로 보여준다 (textContent로만)
+    var quoteToSend = pendingQuote;
+    if (quoteToSend) {
+      var quoteMsg = el('blockquote', 'msg-quote', quoteToSend);
+      askMessagesEl.appendChild(quoteMsg);
+      setQuote(null); // 한 번 보내면 인용은 비운다
+    }
+    appendMessage(askMessagesEl, 'user', text);
+    scrollToBottom(askMessagesEl);
+    askInputEl.value = '';
+    setAskBusy(true);
+
+    var body = { question: text };
+    if (askContext) body.context = askContext;
+    if (quoteToSend) body.quote = quoteToSend;
+    if (askSessionId) body.sessionId = askSessionId;
+
+    apiPost('/api/ask', body).then(function (data) {
+      askSessionId = data.sessionId;
+      appendMessage(askMessagesEl, 'assistant', data.reply); // marked+DOMPurify 경유
+      appendCostNote(askMessagesEl, data.costUsd);
+      scrollToBottom(askMessagesEl);
+    }).catch(function (err) {
+      showError(askErrorEl, err.message);
+    }).finally(function () {
+      setAskBusy(false);
+      askInputEl.focus();
+    });
+  }
+
+  askFormEl.addEventListener('submit', function (e) {
+    e.preventDefault();
+    sendAsk();
+  });
+
+  askInputEl.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
+      e.preventDefault();
+      sendAsk();
+    }
+  });
+
+  // ============================================================
+  // ❓ 드래그 질문 — 텍스트 선택 시 "이 부분 물어보기" 칩
+  // ============================================================
+
+  var selectionChipEl = $('#selection-chip');
+  var selectionChipText = null;       // 칩을 띄울 때의 선택 텍스트
+  var selectionDebounceTimer = null;
+  var SELECTION_DEBOUNCE_MS = 200;
+  var SELECTION_MIN_CHARS = 3;
+
+  function hideSelectionChip() {
+    selectionChipEl.classList.add('hidden');
+    selectionChipText = null;
+  }
+
+  // 선택 영역이 칩을 띄우면 안 되는 곳(입력창/버튼/물어보기 패널 등)에 있는지 검사
+  function selectionInExcludedArea(node) {
+    var elNode = node && (node.nodeType === 1 ? node : node.parentElement);
+    if (!elNode || !elNode.closest) return true;
+    if (elNode.closest('textarea, input, button, .ask-panel, .ask-fab, .selection-chip, .sidebar')) {
+      return true;
+    }
+    // 앱 콘텐츠 영역(.main) 안에서만 칩을 띄운다
+    return !elNode.closest('.main');
+  }
+
+  function showSelectionChipAt(rect, text) {
+    selectionChipText = text;
+    selectionChipEl.classList.remove('hidden');
+    // 선택 끝 좌표 근처에 표시 (position: fixed — 화면 밖으로 나가지 않게 보정)
+    var chipW = selectionChipEl.offsetWidth || 170;
+    var chipH = selectionChipEl.offsetHeight || 40;
+    var left = Math.min(rect.right + 6, window.innerWidth - chipW - 12);
+    var top = rect.bottom + 8;
+    if (top + chipH > window.innerHeight - 12) top = Math.max(12, rect.top - chipH - 8);
+    selectionChipEl.style.left = Math.max(12, left) + 'px';
+    selectionChipEl.style.top = top + 'px';
+  }
+
+  function handleSelectionChange() {
+    var sel = window.getSelection ? window.getSelection() : null;
+    if (!sel || sel.rangeCount === 0 || sel.isCollapsed) {
+      hideSelectionChip();
+      return;
+    }
+    var text = sel.toString().trim();
+    if (text.length < SELECTION_MIN_CHARS) {
+      hideSelectionChip();
+      return;
+    }
+    var range = sel.getRangeAt(0);
+    if (selectionInExcludedArea(range.commonAncestorContainer)) {
+      hideSelectionChip();
+      return;
+    }
+    var rects = range.getClientRects();
+    var rect = rects.length > 0 ? rects[rects.length - 1] : range.getBoundingClientRect();
+    if (!rect || (rect.width === 0 && rect.height === 0)) {
+      hideSelectionChip();
+      return;
+    }
+    showSelectionChipAt(rect, text);
+  }
+
+  document.addEventListener('selectionchange', function () {
+    if (selectionDebounceTimer) clearTimeout(selectionDebounceTimer);
+    selectionDebounceTimer = setTimeout(function () {
+      selectionDebounceTimer = null;
+      handleSelectionChange();
+    }, SELECTION_DEBOUNCE_MS);
+  });
+
+  // 칩 클릭: mousedown에서 preventDefault — 클릭으로 선택이 풀리기 전에 처리한다
+  selectionChipEl.addEventListener('mousedown', function (e) {
+    e.preventDefault();
+    e.stopPropagation();
+    var quote = selectionChipText;
+    hideSelectionChip();
+    if (quote) openAskPanel(quote.slice(0, CONTEXT_MAX_CHARS));
+  });
+
+  // 스크롤하거나 다른 곳을 클릭하면 칩을 숨긴다 (capture: .main 내부 스크롤도 포착)
+  window.addEventListener('scroll', hideSelectionChip, true);
+  document.addEventListener('mousedown', function (e) {
+    if (!selectionChipEl.classList.contains('hidden') &&
+        !selectionChipEl.contains(e.target)) {
+      hideSelectionChip();
+    }
   });
 
   // ---------- 초기 로드 ----------

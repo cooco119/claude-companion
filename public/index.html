@@ -23,8 +23,8 @@
         <button class="tab-btn active" data-tab="learn">
           <span class="tab-emoji">🎓</span> 배우기
         </button>
-        <button class="tab-btn" data-tab="chat">
-          <span class="tab-emoji">💬</span> 채팅
+        <button class="tab-btn" data-tab="news">
+          <span class="tab-emoji">📰</span> 새 소식
         </button>
         <button class="tab-btn" data-tab="companion">
           <span class="tab-emoji">🧭</span> 컴패니언
@@ -34,7 +34,7 @@
     </aside>
 
     <!-- 메인 -->
-    <main class="main">
+    <main class="main" id="main-content">
 
       <!-- 🎓 배우기 -->
       <section class="view active" id="view-learn">
@@ -57,32 +57,21 @@
         </div>
       </section>
 
-      <!-- 💬 채팅 -->
-      <section class="view" id="view-chat">
+      <!-- 📰 새 소식 -->
+      <section class="view" id="view-news">
         <header class="view-header">
-          <h1>💬 채팅</h1>
-          <p class="view-desc">클로드와 자유롭게 대화해 보세요. 이전 대화도 저장되어 이어갈 수 있어요.</p>
+          <h1>📰 새 소식</h1>
+          <p class="view-desc">
+            Claude와 Claude Code의 최근 소식을 골라 왔어요. 궁금한 점은 오른쪽 아래 ❓ 물어보기를 눌러 주세요.
+            <span id="news-updated-at" class="news-updated-at"></span>
+          </p>
         </header>
-        <div class="chat-layout">
-          <div class="chat-sessions-pane">
-            <button id="new-chat-btn" class="btn btn-primary btn-block">＋ 새 대화</button>
-            <div id="chat-session-list" class="session-list">
-              <div class="loading-note">대화 목록을 불러오는 중이에요…</div>
-            </div>
-          </div>
-          <div class="chat-main-pane card">
-            <div id="chat-messages" class="chat-messages">
-              <div class="empty-note">새 대화를 시작하거나, 왼쪽에서 이전 대화를 골라 주세요. 😊</div>
-            </div>
-            <div id="chat-error" class="error-box hidden"></div>
-            <div id="chat-thinking" class="thinking-note hidden">
-              🤔 클로드가 생각하고 있어요… <span class="thinking-sub">(몇십 초 걸릴 수 있어요)</span>
-            </div>
-            <form id="chat-form" class="chat-input-row">
-              <textarea id="chat-input" rows="2" placeholder="무엇이든 물어보세요. (Enter로 전송, Shift+Enter로 줄바꿈)"></textarea>
-              <button type="submit" id="chat-send-btn" class="btn btn-primary">보내기</button>
-            </form>
-          </div>
+        <div id="news-refreshing-banner" class="thinking-note hidden">
+          🔄 새 소식 가져오는 중… <span class="thinking-sub">(1~2분 걸릴 수 있어요)</span>
+        </div>
+        <div id="news-error" class="error-box hidden"></div>
+        <div id="news-list" class="news-list">
+          <div class="loading-note">소식을 불러오는 중이에요…</div>
         </div>
       </section>
 
@@ -93,91 +82,107 @@
           <p class="view-desc">진행 중인 Claude Code 작업을 함께 보며 조언해 주고, 보내기 전 요청문도 같이 다듬어 드려요.</p>
         </header>
 
-        <!-- 섹션 점프 미니 내비 -->
-        <nav class="companion-nav" aria-label="컴패니언 섹션 이동">
-          <button type="button" class="companion-nav-btn" data-target="companion-news">📰 소식</button>
-          <button type="button" class="companion-nav-btn" data-target="companion-advise">📋 조언</button>
-          <button type="button" class="companion-nav-btn" data-target="companion-refine">✏️ 다듬기</button>
-        </nav>
+        <div class="companion-split">
 
-        <!-- 📰 오늘의 클로드 -->
-        <div class="companion-section" id="companion-news">
-          <h2 class="section-title">📰 오늘의 클로드</h2>
-          <p class="section-desc">
-            Claude와 Claude Code의 최근 소식을 골라 왔어요.
-            <span id="news-updated-at" class="news-updated-at"></span>
-          </p>
-          <div id="news-refreshing-banner" class="thinking-note hidden">
-            🔄 새 소식 가져오는 중… <span class="thinking-sub">(1~2분 걸릴 수 있어요)</span>
-          </div>
-          <div id="news-error" class="error-box hidden"></div>
-          <div id="news-list" class="news-list">
-            <div class="loading-note">소식을 불러오는 중이에요…</div>
-          </div>
-
-          <!-- 소식에 대해 물어보기 -->
-          <div class="card news-ask-card">
-            <h3 class="news-ask-title">💬 소식에 대해 물어보기</h3>
-            <div id="news-ask-messages" class="chat-messages news-ask-messages">
-              <div class="empty-note">궁금한 소식이 있으면 물어보세요. 예: "이 기능은 나한테 어떻게 도움이 돼요?"</div>
+          <!-- (좌) 진행 중인 작업 -->
+          <div class="companion-col" id="companion-work">
+            <h2 class="section-title">📋 진행 중인 작업</h2>
+            <p class="section-desc">최근 Claude Code 작업 목록이에요. 하나를 고르면 조언이나 피드백 리포트를 받을 수 있어요.</p>
+            <div id="cc-session-list" class="cc-session-list">
+              <div class="loading-note">작업 목록을 불러오는 중이에요…</div>
             </div>
-            <div id="news-ask-error" class="error-box hidden"></div>
-            <div id="news-ask-thinking" class="thinking-note hidden">
-              🤔 클로드가 생각하고 있어요… <span class="thinking-sub">(몇십 초 걸릴 수 있어요)</span>
-            </div>
-            <form id="news-ask-form" class="chat-input-row">
-              <textarea id="news-ask-input" rows="2" placeholder="소식에 대해 궁금한 점을 적어 보세요. (Enter로 전송, Shift+Enter로 줄바꿈)"></textarea>
-              <button type="submit" id="news-ask-send-btn" class="btn btn-primary">물어보기</button>
-            </form>
-          </div>
-        </div>
-
-        <!-- 조언 받기 -->
-        <div class="companion-section" id="companion-advise">
-          <h2 class="section-title">📋 작업 세션 보고 조언 받기</h2>
-          <p class="section-desc">최근 Claude Code 작업 목록이에요. 하나를 고르면 클로드가 상황을 읽고 조언해 드려요.</p>
-          <div id="cc-session-list" class="cc-session-list">
-            <div class="loading-note">작업 목록을 불러오는 중이에요…</div>
-          </div>
-          <div id="advise-controls" class="advise-controls hidden">
-            <div class="selected-session-label" id="selected-session-label"></div>
-            <div class="advise-input-row">
-              <input type="text" id="focus-input" placeholder="(선택) 특별히 봐줬으면 하는 부분이 있나요? 예: 지금 막힌 부분" />
-              <button id="advise-btn" class="btn btn-primary">조언 받기</button>
-            </div>
-          </div>
-          <div id="advise-thinking" class="thinking-note hidden">
-            🤔 클로드가 작업 내용을 읽고 있어요… <span class="thinking-sub">(몇십 초 걸릴 수 있어요)</span>
-          </div>
-          <div id="advise-error" class="error-box hidden"></div>
-          <article id="advise-result" class="markdown card hidden"></article>
-        </div>
-
-        <!-- 보내기 전 다듬기 -->
-        <div class="companion-section" id="companion-refine">
-          <h2 class="section-title">✏️ 보내기 전 다듬기</h2>
-          <p class="section-desc">Claude Code에 보낼 요청문을 미리 적어 보세요. 클로드가 더 명확해지도록 같이 다듬어 드려요.</p>
-          <div class="card refine-card">
-            <div id="refine-messages" class="chat-messages refine-messages">
-              <div class="empty-note">아래에 보내고 싶은 요청문 초안을 적고 '다듬기 시작'을 눌러 주세요.</div>
-            </div>
-            <div id="refine-error" class="error-box hidden"></div>
-            <div id="refine-thinking" class="thinking-note hidden">
-              🤔 클로드가 생각하고 있어요… <span class="thinking-sub">(몇십 초 걸릴 수 있어요)</span>
-            </div>
-            <form id="refine-form" class="chat-input-row">
-              <textarea id="refine-input" rows="3" placeholder="예: 우리 가게 홈페이지를 만들고 싶어요…"></textarea>
-              <div class="refine-btn-col">
-                <button type="submit" id="refine-send-btn" class="btn btn-primary">다듬기 시작</button>
-                <button type="button" id="refine-reset-btn" class="btn btn-ghost hidden">새로 시작</button>
+            <div id="advise-controls" class="advise-controls hidden">
+              <div class="selected-session-label" id="selected-session-label"></div>
+              <input type="text" id="focus-input" class="focus-input"
+                placeholder="(선택) 특별히 봐줬으면 하는 부분이 있나요? 예: 지금 막힌 부분" />
+              <div class="work-btn-row">
+                <button id="advise-btn" class="btn btn-primary">💡 조언 받기</button>
+                <button id="feedback-btn" class="btn btn-secondary">📝 피드백 리포트 받기</button>
               </div>
-            </form>
+            </div>
+            <div id="advise-thinking" class="thinking-note hidden">
+              🤔 클로드가 작업 내용을 읽고 있어요… <span class="thinking-sub">(몇십 초 걸릴 수 있어요)</span>
+            </div>
+            <div id="feedback-thinking" class="thinking-note hidden">
+              📝 리포트를 만들고 있어요… <span class="thinking-sub">(1~2분 걸릴 수 있어요)</span>
+            </div>
+            <div id="advise-error" class="error-box hidden"></div>
+            <article id="advise-result" class="markdown card hidden"></article>
+            <article id="feedback-result" class="markdown card hidden"></article>
           </div>
+
+          <!-- (우) 보내기 전 다듬기 -->
+          <div class="companion-col" id="companion-refine">
+            <h2 class="section-title">✏️ 보내기 전 다듬기</h2>
+            <p class="section-desc">Claude Code에 보낼 요청문을 미리 적어 보세요. 클로드가 더 명확해지도록 같이 다듬어 드려요.</p>
+            <div class="card refine-card">
+              <div id="refine-messages" class="chat-messages refine-messages">
+                <div class="empty-note">아래에 보내고 싶은 요청문 초안을 적고 '다듬기 시작'을 눌러 주세요.</div>
+              </div>
+              <div id="refine-error" class="error-box hidden"></div>
+              <div id="refine-thinking" class="thinking-note hidden">
+                🤔 클로드가 생각하고 있어요… <span class="thinking-sub">(몇십 초 걸릴 수 있어요)</span>
+              </div>
+              <form id="refine-form" class="chat-input-row">
+                <textarea id="refine-input" rows="3" placeholder="예: 우리 가게 홈페이지를 만들고 싶어요…"></textarea>
+                <div class="refine-btn-col">
+                  <button type="submit" id="refine-send-btn" class="btn btn-primary">다듬기 시작</button>
+                  <button type="button" id="refine-reset-btn" class="btn btn-ghost hidden">새로 시작</button>
+                </div>
+              </form>
+            </div>
+          </div>
+
         </div>
       </section>
 
     </main>
   </div>
+
+  <!-- ❓ 물어보기 FAB -->
+  <button type="button" id="ask-fab" class="ask-fab" aria-label="물어보기 패널 열기">
+    <span class="ask-fab-emoji">❓</span><span class="ask-fab-label">물어보기</span>
+  </button>
+
+  <!-- 물어보기 슬라이드 패널 (오버레이 + 패널) -->
+  <div id="ask-overlay" class="ask-overlay hidden"></div>
+  <aside id="ask-panel" class="ask-panel" aria-hidden="true" aria-label="물어보기 패널">
+    <div class="ask-panel-header">
+      <div class="ask-panel-title">❓ 물어보기</div>
+      <button type="button" id="ask-new-btn" class="btn btn-ghost btn-small">새 대화</button>
+      <button type="button" id="ask-close-btn" class="ask-close-btn" aria-label="패널 닫기">×</button>
+    </div>
+    <div id="ask-context-chip" class="ask-context-chip hidden">
+      <span class="ask-context-chip-emoji">👀</span>
+      <span class="ask-context-chip-body">
+        <span class="ask-context-chip-label">지금 보고 계신 것</span>
+        <span id="ask-context-chip-text" class="ask-context-chip-text"></span>
+      </span>
+      <button type="button" id="ask-context-remove" class="ask-chip-remove" aria-label="컨텍스트 제외">×</button>
+    </div>
+    <div id="ask-messages" class="chat-messages ask-messages">
+      <div class="empty-note">Claude Code나 이 앱에 대해 무엇이든 물어보세요. 보고 있던 화면 내용도 같이 보내드려요. 😊</div>
+    </div>
+    <div id="ask-error" class="error-box hidden"></div>
+    <div id="ask-thinking" class="thinking-note hidden">
+      🤔 튜터가 생각하고 있어요… <span class="thinking-sub">(몇십 초 걸릴 수 있어요)</span>
+    </div>
+    <div id="ask-quote-box" class="ask-quote-box hidden">
+      <div class="ask-quote-head">
+        <span class="ask-quote-label">📌 이 부분에 대해 물어봐요</span>
+        <button type="button" id="ask-quote-remove" class="ask-chip-remove" aria-label="인용 제거">×</button>
+      </div>
+      <blockquote id="ask-quote-text" class="ask-quote-text"></blockquote>
+    </div>
+    <form id="ask-form" class="chat-input-row ask-input-row">
+      <textarea id="ask-input" rows="2" placeholder="궁금한 점을 적어 보세요. (Enter로 전송, Shift+Enter로 줄바꿈)"></textarea>
+      <button type="submit" id="ask-send-btn" class="btn btn-primary">보내기</button>
+    </form>
+  </aside>
+
+  <!-- 드래그 질문 칩 -->
+  <button type="button" id="selection-chip" class="selection-chip hidden">❓ 이 부분 물어보기</button>
+
   <script src="app.js"></script>
 </body>
 </html>

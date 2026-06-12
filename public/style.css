@@ -296,69 +296,7 @@ body {
 }
 .markdown th { background: var(--cream); }
 
-/* ---------- 채팅 ---------- */
-.chat-layout {
-  display: flex;
-  gap: 24px;
-  align-items: flex-start;
-}
-
-.chat-sessions-pane {
-  width: 260px;
-  flex-shrink: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-}
-
-.session-list {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  max-height: 60vh;
-  overflow-y: auto;
-}
-
-.session-item {
-  display: block;
-  width: 100%;
-  text-align: left;
-  font-family: inherit;
-  background: var(--white);
-  border: 2px solid transparent;
-  border-radius: var(--radius-sm);
-  box-shadow: var(--shadow);
-  padding: 12px 14px;
-  cursor: pointer;
-  transition: border-color 0.15s ease;
-}
-
-.session-item:hover { border-color: var(--peach); }
-.session-item.active { border-color: var(--coral); background: var(--coral-soft); }
-
-.session-item-title {
-  font-size: 15px;
-  font-weight: 700;
-  color: var(--brown);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.session-item-meta {
-  font-size: 13px;
-  color: var(--brown-soft);
-  margin-top: 2px;
-}
-
-.chat-main-pane {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  min-height: 480px;
-}
-
+/* ---------- 대화 말풍선 (다듬기/물어보기에서 공용) ---------- */
 .chat-messages {
   flex: 1;
   overflow-y: auto;
@@ -446,8 +384,19 @@ body {
   border-color: var(--coral);
 }
 
-/* ---------- 컴패니언 ---------- */
-.companion-section { margin-bottom: 40px; }
+/* ---------- 컴패니언 (좌우 스플릿: 1024px 이상 2열, 미만 세로 스택) ---------- */
+.companion-split {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 32px;
+  align-items: start;
+}
+
+@media (min-width: 1024px) {
+  .companion-split { grid-template-columns: 1fr 1fr; }
+}
+
+.companion-col { min-width: 0; }
 
 .section-title { font-size: 21px; margin: 0 0 4px; }
 
@@ -502,10 +451,9 @@ body {
   margin-bottom: 8px;
 }
 
-.advise-input-row { display: flex; gap: 10px; }
-
-.advise-input-row input {
-  flex: 1;
+.focus-input {
+  display: block;
+  width: 100%;
   font-family: inherit;
   font-size: 16px;
   padding: 12px 16px;
@@ -513,12 +461,36 @@ body {
   border-radius: var(--radius-sm);
   background: var(--white);
   color: var(--brown);
+  margin-bottom: 10px;
 }
 
-.advise-input-row input:focus {
+.focus-input:focus {
   outline: none;
   border-color: var(--coral);
 }
+
+.work-btn-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+/* 보조 동작 버튼 (피드백 리포트 등) — 코랄 테두리의 차분한 버튼 */
+.btn-secondary {
+  background: var(--white);
+  color: var(--coral-deep);
+  border: 2px solid var(--coral);
+}
+
+.btn-secondary:hover { background: var(--coral-soft); }
+
+.btn-secondary:disabled {
+  border-color: var(--peach);
+  color: #b08a6a;
+  cursor: not-allowed;
+}
+
+#advise-result, #feedback-result { margin-top: 14px; }
 
 .refine-card { display: flex; flex-direction: column; }
 
@@ -530,52 +502,7 @@ body {
   gap: 8px;
 }
 
-/* ---------- 컴패니언: 섹션 점프 미니 내비 ---------- */
-.companion-nav {
-  position: sticky;
-  top: 0;
-  z-index: 5;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  padding: 8px 0 12px;
-  margin-bottom: 16px;
-  background: var(--cream);
-  border-bottom: 2px dashed var(--cream-deep);
-}
-
-.companion-nav-btn {
-  font-family: inherit;
-  font-size: 15px;
-  font-weight: 700;
-  color: var(--brown);
-  background: var(--white);
-  border: 2px solid var(--cream-deep);
-  border-radius: 999px;
-  padding: 8px 18px;
-  cursor: pointer;
-  transition: border-color 0.15s ease, background 0.15s ease;
-}
-
-.companion-nav-btn:hover {
-  border-color: var(--coral);
-  background: var(--coral-soft);
-  color: var(--coral-deep);
-}
-
-/* 현재 위치 표시 (클릭한 섹션) */
-.companion-nav-btn.active {
-  border-color: var(--coral);
-  background: var(--coral-soft);
-  color: var(--coral-deep);
-}
-
-/* sticky 내비에 섹션 제목이 가려지지 않도록 (scrollIntoView 시 내비 높이만큼 여유) */
-.companion-section {
-  scroll-margin-top: 64px;
-}
-
-/* ---------- 컴패니언: 📰 오늘의 클로드 ---------- */
+/* ---------- 📰 새 소식 ---------- */
 .news-updated-at {
   font-size: 14px;
   color: var(--brown-soft);
@@ -644,16 +571,6 @@ body {
 }
 
 .news-card-link:hover { border-bottom-color: var(--coral); }
-
-/* 소식 Q&A */
-.news-ask-card { display: flex; flex-direction: column; }
-
-.news-ask-title {
-  margin: 0 0 12px;
-  font-size: 18px;
-}
-
-.news-ask-messages { max-height: 40vh; min-height: 100px; }
 
 /* ---------- 컴패니언: 다듬기 guidance ---------- */
 .guidance {
@@ -805,6 +722,226 @@ body {
   margin-top: 3px;
 }
 
+/* ---------- ❓ 물어보기 FAB ---------- */
+.ask-fab {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: inherit;
+  font-size: 17px;
+  font-weight: 800;
+  color: #fff;
+  background: var(--coral);
+  border: none;
+  border-radius: 999px;
+  padding: 14px 22px;
+  cursor: pointer;
+  box-shadow: 0 6px 18px rgba(232, 96, 63, 0.35);
+  transition: transform 0.1s ease, background 0.15s ease;
+}
+
+.ask-fab:hover { background: var(--coral-deep); }
+.ask-fab:active { transform: scale(0.96); }
+.ask-fab-emoji { font-size: 20px; }
+
+/* ---------- ❓ 물어보기 슬라이드 패널 ---------- */
+.ask-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  background: rgba(74, 55, 40, 0.25);
+}
+
+.ask-panel {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 80;
+  width: 420px;
+  max-width: 100vw;
+  background: var(--white);
+  border-left: 2px solid var(--cream-deep);
+  box-shadow: -8px 0 28px rgba(120, 80, 40, 0.18);
+  display: flex;
+  flex-direction: column;
+  padding: 20px;
+  transform: translateX(105%);
+  transition: transform 0.22s ease;
+}
+
+.ask-panel.open { transform: translateX(0); }
+
+.ask-panel-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-bottom: 12px;
+  border-bottom: 2px dashed var(--cream-deep);
+  margin-bottom: 12px;
+}
+
+.ask-panel-title {
+  font-size: 19px;
+  font-weight: 800;
+  margin-right: auto;
+}
+
+.btn-small {
+  font-size: 14px;
+  padding: 6px 14px;
+}
+
+.ask-close-btn {
+  font-family: inherit;
+  font-size: 24px;
+  line-height: 1;
+  font-weight: 700;
+  color: var(--brown-soft);
+  background: transparent;
+  border: none;
+  border-radius: 999px;
+  width: 36px;
+  height: 36px;
+  cursor: pointer;
+}
+
+.ask-close-btn:hover { background: var(--cream); color: var(--brown); }
+
+/* "지금 보고 계신 것" 컨텍스트 칩 */
+.ask-context-chip {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--cream);
+  border: 2px solid var(--cream-deep);
+  border-radius: 999px;
+  padding: 8px 14px;
+  margin-bottom: 12px;
+}
+
+.ask-context-chip-emoji { flex-shrink: 0; }
+
+.ask-context-chip-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.ask-context-chip-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--brown-soft);
+}
+
+.ask-context-chip-text {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--brown);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ask-chip-remove {
+  flex-shrink: 0;
+  font-family: inherit;
+  font-size: 18px;
+  line-height: 1;
+  font-weight: 700;
+  color: var(--brown-soft);
+  background: transparent;
+  border: none;
+  border-radius: 999px;
+  width: 28px;
+  height: 28px;
+  cursor: pointer;
+}
+
+.ask-chip-remove:hover { background: var(--coral-soft); color: var(--coral-deep); }
+
+.ask-messages {
+  flex: 1;
+  max-height: none;
+  min-height: 0;
+}
+
+/* 드래그한 인용 미리보기 박스 (전송 전) */
+.ask-quote-box {
+  background: var(--cream);
+  border: 2px solid var(--peach);
+  border-radius: var(--radius-sm);
+  padding: 10px 14px;
+  margin-top: 10px;
+}
+
+.ask-quote-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.ask-quote-label {
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--brown-soft);
+}
+
+.ask-quote-text {
+  margin: 6px 0 0;
+  padding: 6px 12px;
+  border-left: 4px solid var(--coral);
+  background: var(--white);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  font-size: 14px;
+  color: var(--brown);
+  max-height: 110px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* 대화에 표시되는 인용 블록 (전송 시 사용자 말풍선 위) */
+.msg-quote {
+  align-self: flex-end;
+  max-width: 85%;
+  margin: 0;
+  padding: 8px 14px;
+  border-right: 4px solid var(--coral);
+  background: var(--coral-soft);
+  border-radius: var(--radius-sm) 0 0 var(--radius-sm);
+  font-size: 14px;
+  color: var(--brown);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.ask-input-row { margin-top: 12px; }
+
+/* ---------- 드래그 질문 칩 ---------- */
+.selection-chip {
+  position: fixed;
+  z-index: 90;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 800;
+  color: #fff;
+  background: var(--coral);
+  border: none;
+  border-radius: 999px;
+  padding: 8px 16px;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(232, 96, 63, 0.35);
+}
+
+.selection-chip:hover { background: var(--coral-deep); }
+
 /* ---------- 좁은 화면 ---------- */
 @media (max-width: 860px) {
   .app { flex-direction: column; height: auto; }
@@ -820,6 +957,8 @@ body {
   .tabs { flex-direction: row; margin-left: auto; }
   .sidebar-footer { display: none; }
   .main { padding: 20px 16px 40px; }
-  .learn-layout, .chat-layout { flex-direction: column; }
-  .lesson-list-pane, .chat-sessions-pane { width: 100%; }
+  .learn-layout { flex-direction: column; }
+  .lesson-list-pane { width: 100%; }
+  .ask-panel { width: 100vw; border-left: none; }
+  .ask-fab { right: 16px; bottom: 16px; }
 }

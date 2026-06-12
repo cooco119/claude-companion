@@ -26,7 +26,7 @@ const DATA_FILE = path.resolve(
 
 /**
  * 모든 mutate(읽기-수정-쓰기)를 단일 promise 체인으로 직렬화한다.
- * /api/chat과 /api/companion/refine이 동시에 들어와도 load→save가 겹쳐
+ * /api/ask와 /api/companion/refine이 동시에 들어와도 load→save가 겹쳐
  * 서로의 변경을 덮어쓰는(lost update) 일이 없도록 한다.
  */
 let mutateChain: Promise<unknown> = Promise.resolve();

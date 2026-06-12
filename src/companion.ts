@@ -1,5 +1,5 @@
 /**
- * companion.ts — 컴패니언 기능: advise(세션 조언) / refine(요청문 다듬기)
+ * companion.ts — 컴패니언 기능: advise(세션 조언) / refine(요청문 다듬기) / feedback(회고 리포트)
  *
  * 프롬프트 원칙 (ARCHITECTURE.md):
  * - advise: 트랜스크립트 다이제스트(최근 텍스트 메시지 ~30개, 전체 8천자 내 절단)를 넣고
@@ -7,9 +7,13 @@
  *   말투는 비개발자 친화(전문용어엔 한 줄 설명).
  * - refine: 바로 고쳐 쓰지 말고 모호한 점을 1–2개 묻고, 충분히 명확해지면 최종 요청문을
  *   코드블록으로 제안하는 코치. --resume으로 연속 대화.
+ * - feedback: 같은 다이제스트로 따뜻한 회고 리포트(마크다운) — ① 한 줄 요약 ② 잘하신 점 2–3개
+ *   ③ 더 잘 쓰는 법 3–5개(왜 + "그때 이렇게 말해보세요" 고쳐 쓴 예시 인용) ④ 추천 레슨 1–2개
+ *   (레슨 제목 목록 주입) ⑤ 한 줄 격려. 일회성 호출 — 세션 저장 안 함.
  */
 import { runClaude } from './claude.js';
 import { parseTranscript, type TranscriptMessage } from './ccSessions.js';
+import { listLessons } from './lessons.js';
 
 /** 다듬기 대화마다 함께 내려가는 안내 카드 데이터 (ARCHITECTURE.md의 Guidance) */
 export type Guidance = {
@@ -72,6 +76,53 @@ export async function advise(
 
   const result = await runClaude(prompt);
   return { advice: result.text, costUsd: result.costUsd };
+}
+
+/**
+ * 선택한 Claude Code 세션을 회고해 "어떻게 더 잘 쓸지" 피드백 리포트(마크다운)를 만든다.
+ * advise와 같은 다이제스트를 쓰는 일회성 호출 — 앱 세션으로 저장하지 않는다.
+ */
+export async function feedback(
+  transcriptPath: string
+): Promise<{ report: string; costUsd: number }> {
+  const messages = await parseTranscript(transcriptPath);
+  if (messages.length === 0) {
+    throw new Error('세션 파일에서 대화 내용을 읽지 못했어요. 다른 세션을 선택해 보세요.');
+  }
+  const digest = buildDigest(messages);
+
+  // 추천 레슨 안내용으로 배우기 탭의 레슨 제목 목록을 주입한다
+  const lessons = await listLessons();
+  const lessonList =
+    lessons.length > 0
+      ? lessons.map((l) => `- ${l.title}`).join('\n')
+      : '(레슨 목록을 불러오지 못했어요 — 이 경우 ④는 생략하세요)';
+
+  const prompt = [
+    '당신은 코딩을 모르는 비개발자가 Claude Code를 더 잘 쓰도록 돕는 따뜻한 한국어 코치입니다.',
+    '아래는 사용자가 Claude Code와 나눈 세션의 최근 대화 내용입니다. 이 세션을 회고하는',
+    '피드백 리포트를 마크다운으로 써 주세요. 절대 비판적이거나 채점하는 말투를 쓰지 말고,',
+    '따뜻하게 격려하면서 구체적으로 도와주세요.',
+    '',
+    '--- 세션 대화 시작 ---',
+    digest,
+    '--- 세션 대화 끝 ---',
+    '',
+    '리포트는 다음 다섯 부분으로 구성하세요 (마크다운 제목/목록 사용):',
+    '① 이 세션 한 줄 요약',
+    '② 잘하신 점 2–3개 — 실제 대화에서 잘한 부분을 짚어 주세요.',
+    '③ 더 잘 쓰는 법 3–5개 — 각 항목마다: 왜 도움이 되는지 + **"그때 이렇게 말해보세요"** 라며',
+    '   실제 대화 속 사용자의 말을 고쳐 쓴 예시를 인용(blockquote)으로 보여 주세요.',
+    '④ 추천 레슨 1–2개 — 아래 레슨 목록에서 이 세션과 가장 관련 있는 것을 골라,',
+    '   이 앱의 배우기 탭에서 읽어 보라고 안내하세요:',
+    lessonList,
+    '⑤ 한 줄 격려로 마무리.',
+    '',
+    '말투는 비개발자 친화적으로, 전문용어가 나오면 한 줄 설명을 덧붙여 주세요.',
+  ].join('\n');
+
+  const result = await runClaude(prompt);
+  return { report: result.text, costUsd: result.costUsd };
 }
 
 const REFINE_SYSTEM = [

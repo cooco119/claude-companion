@@ -1,5 +1,5 @@
 /**
- * news.ts — 📰 오늘의 클로드: 뉴스 캐시/갱신 + 소식 Q&A
+ * news.ts — 📰 오늘의 클로드: 뉴스 캐시/갱신
  *
  * 계약 (ARCHITECTURE.md "뉴스 캐시/갱신"):
  * - 캐시: data/news.json = { fetchedAt: ISO, items: NewsItem[] }. TTL 6시간.
@@ -15,7 +15,7 @@ import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { runClaude, type ClaudeResult } from './claude.js';
+import { runClaude } from './claude.js';
 
 export type NewsItem = {
   title: string; // 한국어 제목 (원문이 영어면 번역)
@@ -331,42 +331,4 @@ function nonEmptyString(v: unknown): string | null {
   if (typeof v !== 'string') return null;
   const t = v.trim();
   return t === '' ? null : t;
-}
-
-// ── 소식 Q&A: POST /api/companion/news/ask 용 ─────────────
-
-const NEWS_ASK_SYSTEM = [
-  '당신은 코딩을 모르는 비개발자에게 Claude 관련 소식을 쉽게 풀어 설명해 주는 한국어 도우미입니다.',
-  '아래 "최근 소식 다이제스트"를 기본 맥락으로 삼아 사용자의 질문에 답하세요.',
-  '말투는 친절하고 짧게, 전문용어가 나오면 한 줄 설명을 덧붙이세요.',
-  '다이제스트에 없는 내용을 단정하지 말고, 모르면 모른다고 말하세요.',
-].join('\n');
-
-/**
- * 소식 Q&A 한 턴. 첫 턴이면 캐시된 다이제스트(items의 title+summary)를 컨텍스트로 넣고,
- * 이후 턴은 --resume으로 같은 대화를 이어간다.
- */
-export async function askNewsTurn(
-  question: string,
-  resumeClaudeSessionId: string | null
-): Promise<ClaudeResult> {
-  if (resumeClaudeSessionId) {
-    return runClaude(question, { resumeSessionId: resumeClaudeSessionId });
-  }
-  const cache = await readCache();
-  const digest =
-    cache && cache.items.length > 0
-      ? cache.items.map((it, i) => `${i + 1}. ${it.title} — ${it.summary}`).join('\n')
-      : '(아직 가져온 소식이 없어요. 일반적인 지식 범위에서 조심스럽게 답해 주세요.)';
-  const prompt = [
-    NEWS_ASK_SYSTEM,
-    '',
-    '--- 최근 소식 다이제스트 시작 ---',
-    digest,
-    '--- 최근 소식 다이제스트 끝 ---',
-    '',
-    '사용자 질문:',
-    question,
-  ].join('\n');
-  return runClaude(prompt);
 }
