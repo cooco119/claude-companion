@@ -79,22 +79,22 @@
       <section class="view" id="view-companion">
         <header class="view-header">
           <h1>🧭 컴패니언</h1>
-          <p class="view-desc">진행 중인 Claude Code 작업을 함께 보며 조언해 주고, 보내기 전 요청문도 같이 다듬어 드려요.</p>
+          <p class="view-desc">최근 Claude Code 작업을 함께 보며 조언이나 피드백 리포트를 드리고, 보내기 전 요청문도 같이 다듬어 드려요.</p>
         </header>
 
         <div class="companion-split">
 
-          <!-- (좌) 진행 중인 작업 -->
+          <!-- (좌) 최근 작업 -->
           <div class="companion-col" id="companion-work">
-            <h2 class="section-title">📋 진행 중인 작업</h2>
-            <p class="section-desc">최근 Claude Code 작업 목록이에요. 하나를 고르면 조언이나 피드백 리포트를 받을 수 있어요.</p>
+            <h2 class="section-title">📋 최근 작업</h2>
+            <p class="section-desc">최근 Claude Code 작업 목록이에요. 하나를 고르면 진행 중인 작업에는 조언을, 끝난 작업에는 피드백 리포트를 받을 수 있어요.</p>
             <div id="cc-session-list" class="cc-session-list">
               <div class="loading-note">작업 목록을 불러오는 중이에요…</div>
             </div>
             <div id="advise-controls" class="advise-controls hidden">
               <div class="selected-session-label" id="selected-session-label"></div>
               <input type="text" id="focus-input" class="focus-input"
-                placeholder="(선택) 특별히 봐줬으면 하는 부분이 있나요? 예: 지금 막힌 부분" />
+                placeholder="(선택) '조언 받기'에서 특별히 봐줬으면 하는 부분 — 예: 지금 막힌 부분 (피드백 리포트에는 적용되지 않아요)" />
               <div class="work-btn-row">
                 <button id="advise-btn" class="btn btn-primary">💡 조언 받기</button>
                 <button id="feedback-btn" class="btn btn-secondary">📝 피드백 리포트 받기</button>
@@ -158,10 +158,11 @@
         <span class="ask-context-chip-label">지금 보고 계신 것</span>
         <span id="ask-context-chip-text" class="ask-context-chip-text"></span>
       </span>
-      <button type="button" id="ask-context-remove" class="ask-chip-remove" aria-label="컨텍스트 제외">×</button>
+      <button type="button" id="ask-context-remove" class="ask-chip-remove"
+        aria-label="이번엔 화면 내용 안 보내기" title="이번엔 화면 내용 안 보내기 (패널을 다시 열거나 '새 대화'를 누르면 다시 켜져요)">×</button>
     </div>
     <div id="ask-messages" class="chat-messages ask-messages">
-      <div class="empty-note">Claude Code나 이 앱에 대해 무엇이든 물어보세요. 보고 있던 화면 내용도 같이 보내드려요. 😊</div>
+      <div class="empty-note">Claude Code나 이 앱에 대해 무엇이든 물어보세요. 😊</div>
     </div>
     <div id="ask-error" class="error-box hidden"></div>
     <div id="ask-thinking" class="thinking-note hidden">

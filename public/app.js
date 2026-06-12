@@ -191,6 +191,9 @@
 
   function openLesson(slug) {
     var contentEl = $('#lesson-content');
+    // 로딩 안내문/에러문이 이전 레슨 제목과 짝지어져 물어보기 컨텍스트로 새지 않도록
+    // 시작 시 제목을 비우고, 성공했을 때만 다시 설정한다.
+    currentLessonTitle = null;
     contentEl.innerHTML = '';
     contentEl.appendChild(el('div', 'loading-note', '레슨을 불러오는 중이에요…'));
     api('/api/lessons/' + encodeURIComponent(slug)).then(function (data) {
@@ -330,7 +333,7 @@
   }
 
   // ============================================================
-  // 🧭 컴패니언 — (좌) 진행 중인 작업: 조언 / 피드백 리포트
+  // 🧭 컴패니언 — (좌) 최근 작업: 조언 / 피드백 리포트
   // ============================================================
 
   var selectedCcSession = null;
@@ -367,6 +370,9 @@
         btn.appendChild(el('div', 'cc-session-preview', s.preview || '(미리보기 없음)'));
         btn.appendChild(el('div', 'cc-session-time', timeAgo(s.mtime)));
         btn.addEventListener('click', function () {
+          // 조언/리포트 생성 중에는 선택을 바꾸지 않는다 — 완성된 결과가
+          // 새로 선택한 작업에 대한 것처럼 보이는 혼동을 막는다.
+          if (workBusy) return;
           listEl.querySelectorAll('.cc-session-item').forEach(function (b) { b.classList.remove('active'); });
           btn.classList.add('active');
           selectedCcSession = s;
@@ -610,8 +616,9 @@
 
   var askSessionId = null;
   var askBusy = false;
-  var askContext = null;     // AskContext | null — 패널 열 때마다 새로 수집
-  var pendingQuote = null;   // 드래그 질문으로 들어온 인용 텍스트
+  var askContext = null;        // AskContext | null — 패널 열 때마다 새로 수집
+  var askContextSentKey = null; // 이번 대화에서 이미 보낸 컨텍스트 (같으면 재전송하지 않음)
+  var pendingQuote = null;      // 드래그 질문으로 들어온 인용 텍스트
   var askPanelOpen = false;
 
   // 현재 탭에서 "지금 보고 계신 것"을 AskContext로 수집한다. 볼 게 없으면 null.
@@ -674,11 +681,21 @@
     }
   }
 
+  // 첫 안내문을 실제 동작에 맞춘다 — 보낼 화면 내용이 없을 때는 '같이 보내드려요'라고 약속하지 않는다.
+  function updateAskEmptyNote() {
+    var note = askMessagesEl.querySelector('.empty-note');
+    if (!note) return;
+    note.textContent = askContext
+      ? 'Claude Code나 이 앱에 대해 무엇이든 물어보세요. 보고 있던 화면 내용도 같이 보내드려요. 😊'
+      : 'Claude Code나 이 앱에 대해 무엇이든 물어보세요. 😊';
+  }
+
   function openAskPanel(quoteText) {
     hideSelectionChip();
     // 열 때마다 현재 화면 기준으로 컨텍스트를 새로 수집 (×로 제외했어도 다시 열면 재수집)
     askContext = collectAskContext();
     renderContextChip();
+    updateAskEmptyNote();
     if (quoteText) setQuote(quoteText);
     askPanelOpen = true;
     askOverlayEl.classList.remove('hidden');
@@ -709,6 +726,7 @@
   askContextRemoveBtn.addEventListener('click', function () {
     askContext = null; // 이번 패널 세션에서는 컨텍스트 제외
     renderContextChip();
+    updateAskEmptyNote();
   });
 
   askQuoteRemoveBtn.addEventListener('click', function () {
@@ -718,6 +736,7 @@
   askNewBtn.addEventListener('click', function () {
     if (askBusy) return;
     askSessionId = null;
+    askContextSentKey = null; // 새 대화에서는 컨텍스트를 다시 보낼 수 있게 초기화
     setQuote(null);
     hideError(askErrorEl);
     askMessagesEl.innerHTML = '';
@@ -743,11 +762,13 @@
     if (note) note.remove();
 
     // 인용이 있으면 사용자 말풍선 위에 인용 블록으로 보여준다 (textContent로만)
+    // 인용 상자는 전송이 '성공'한 뒤에만 비운다 — 실패하면 그대로 남아 재시도 시 다시 전송된다.
     var quoteToSend = pendingQuote;
+    var quoteMsg = null;
     if (quoteToSend) {
-      var quoteMsg = el('blockquote', 'msg-quote', quoteToSend);
+      quoteMsg = el('blockquote', 'msg-quote', quoteToSend);
       askMessagesEl.appendChild(quoteMsg);
-      setQuote(null); // 한 번 보내면 인용은 비운다
+      askQuoteBoxEl.classList.add('hidden'); // 전송 중에는 상자를 잠시 숨긴다 (pendingQuote는 유지)
     }
     appendMessage(askMessagesEl, 'user', text);
     scrollToBottom(askMessagesEl);
@@ -755,16 +776,28 @@
     setAskBusy(true);
 
     var body = { question: text };
-    if (askContext) body.context = askContext;
+    // 같은 대화에서 이미 보낸 컨텍스트는 다시 보내지 않는다 — --resume 대화에
+    // 매 턴 동일한 4KB 컨텍스트 블록이 중복 주입되는 것을 막는다.
+    var contextKey = askContext ? JSON.stringify(askContext) : null;
+    var contextToSend = (askContext && contextKey !== askContextSentKey) ? askContext : null;
+    if (contextToSend) body.context = contextToSend;
     if (quoteToSend) body.quote = quoteToSend;
     if (askSessionId) body.sessionId = askSessionId;
 
     apiPost('/api/ask', body).then(function (data) {
       askSessionId = data.sessionId;
+      if (contextToSend) askContextSentKey = contextKey; // 전송 성공 — 같은 내용은 재전송하지 않음
+      if (quoteToSend) setQuote(null); // 한 번 '성공적으로' 보내면 인용은 비운다
       appendMessage(askMessagesEl, 'assistant', data.reply); // marked+DOMPurify 경유
       appendCostNote(askMessagesEl, data.costUsd);
       scrollToBottom(askMessagesEl);
     }).catch(function (err) {
+      // 전송 실패 — 인용 말풍선을 제거해 '보낸 것처럼' 보이지 않게 하고,
+      // 인용 상자(pendingQuote)는 복원해 재시도 시 함께 전송되게 한다.
+      if (quoteMsg) {
+        quoteMsg.remove();
+        askQuoteBoxEl.classList.remove('hidden');
+      }
       showError(askErrorEl, err.message);
     }).finally(function () {
       setAskBusy(false);
@@ -792,9 +825,17 @@
   var selectionChipText = null;       // 칩을 띄울 때의 선택 텍스트
   var selectionDebounceTimer = null;
   var SELECTION_DEBOUNCE_MS = 200;
-  var SELECTION_MIN_CHARS = 3;
+  // 한국어에는 '파일', '폴더', '백업' 같은 2글자 단어가 흔하므로 2글자부터 칩을 띄운다
+  // (레슨 2의 '모르는 단어 하나를 드래그' 실습과 일치).
+  var SELECTION_MIN_CHARS = 2;
 
   function hideSelectionChip() {
+    // 대기 중인 디바운스 타이머도 함께 취소 — 칩을 누른 직후 타이머가 발화해
+    // 열린 패널 위로 칩이 다시 떠오르는 것을 막는다.
+    if (selectionDebounceTimer) {
+      clearTimeout(selectionDebounceTimer);
+      selectionDebounceTimer = null;
+    }
     selectionChipEl.classList.add('hidden');
     selectionChipText = null;
   }
@@ -824,6 +865,7 @@
   }
 
   function handleSelectionChange() {
+    if (askPanelOpen) return; // 물어보기 패널이 열려 있는 동안에는 칩을 띄우지 않는다
     var sel = window.getSelection ? window.getSelection() : null;
     if (!sel || sel.rangeCount === 0 || sel.isCollapsed) {
       hideSelectionChip();
@@ -856,13 +898,25 @@
     }, SELECTION_DEBOUNCE_MS);
   });
 
+  function activateSelectionChip() {
+    var quote = selectionChipText;
+    hideSelectionChip();
+    if (quote) openAskPanel(quote.slice(0, CONTEXT_MAX_CHARS));
+  }
+
   // 칩 클릭: mousedown에서 preventDefault — 클릭으로 선택이 풀리기 전에 처리한다
   selectionChipEl.addEventListener('mousedown', function (e) {
     e.preventDefault();
     e.stopPropagation();
-    var quote = selectionChipText;
-    hideSelectionChip();
-    if (quote) openAskPanel(quote.slice(0, CONTEXT_MAX_CHARS));
+    activateSelectionChip();
+  });
+
+  // 키보드 사용자: 칩은 button이므로 Enter/Space로도 동작해야 한다
+  selectionChipEl.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      activateSelectionChip();
+    }
   });
 
   // 스크롤하거나 다른 곳을 클릭하면 칩을 숨긴다 (capture: .main 내부 스크롤도 포착)

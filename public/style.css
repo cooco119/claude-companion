@@ -108,7 +108,9 @@ body {
 .main {
   flex: 1;
   overflow-y: auto;
-  padding: 32px 40px 60px;
+  /* 하단 패딩은 우하단 ❓ FAB(고정, 약 50px 높이 + 24px 여백)가
+     '다듬기 시작' 같은 페이지 맨 아래 버튼을 가리지 않도록 FAB 점유 영역보다 크게 둔다. */
+  padding: 32px 40px 110px;
 }
 
 .view { display: none; max-width: 1080px; margin: 0 auto; }
@@ -956,7 +958,7 @@ body {
   .brand { border-bottom: none; margin-bottom: 0; padding-bottom: 4px; }
   .tabs { flex-direction: row; margin-left: auto; }
   .sidebar-footer { display: none; }
-  .main { padding: 20px 16px 40px; }
+  .main { padding: 20px 16px 100px; } /* 모바일에서도 FAB가 하단 버튼을 가리지 않게 */
   .learn-layout { flex-direction: column; }
   .lesson-list-pane { width: 100%; }
   .ask-panel { width: 100vw; border-left: none; }
