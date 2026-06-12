@@ -52,6 +52,8 @@ type ChatSession = {
   `{type:'text',text}` 배열)와 `type === 'assistant'`(`message.content` 배열에서 `type==='text'`
   항목). 그 외 줄(tool_use 등)은 건너뛴다. 파싱 안 되는 줄은 무시(throw 금지).
 - 목록은 mtime 내림차순, 최근 30개. 미리보기 = 첫 사용자 메시지 앞 80자.
+- **앱 자신의 세션 제외**: 이 앱이 띄우는 claude -p 호출(물어보기/다듬기/조언/소식)도 서버 cwd의
+  프로젝트 디렉터리에 세션을 만들므로, cwd 인코딩 디렉터리는 목록에서 제외한다.
 
 ## HTTP API (src/server.ts가 조립)
 

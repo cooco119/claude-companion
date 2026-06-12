@@ -28,6 +28,14 @@ export interface TranscriptMessage {
 const PROJECTS_DIR = path.join(os.homedir(), '.claude', 'projects');
 const MAX_SESSIONS = 30;
 
+/**
+ * 이 앱 자신이 띄우는 claude -p 호출(물어보기/다듬기/조언/소식 등)도 전부
+ * ~/.claude/projects/<서버 cwd 인코딩>/ 아래에 세션 파일을 만든다. 이 노이즈가
+ * mtime 정렬을 점령해 사용자의 실제 Claude Code 세션을 밀어내므로 목록에서 제외한다.
+ * (인코딩 규칙: cwd의 영숫자 외 문자를 '-'로 치환)
+ */
+const SELF_PROJECT = process.cwd().replace(/[^a-zA-Z0-9]/g, '-');
+
 /** 세션 목록 — mtime 내림차순, 최근 30개. 에러는 모두 삼키고 가능한 만큼 반환. */
 export async function listCcSessions(): Promise<CcSessionInfo[]> {
   let projectDirs: string[] = [];
@@ -40,6 +48,7 @@ export async function listCcSessions(): Promise<CcSessionInfo[]> {
 
   const candidates: Array<{ path: string; project: string; file: string; mtimeMs: number }> = [];
   for (const project of projectDirs) {
+    if (project === SELF_PROJECT) continue; // 앱 자신의 -p 세션은 제외
     const dir = path.join(PROJECTS_DIR, project);
     let files: string[] = [];
     try {
