@@ -1,10 +1,31 @@
+<p align="center">
+  <img src="assets/hero.svg" alt="클로드 컴패니언 — 코딩을 몰라도 Claude Code를 배우고, 따라가고, 잘 쓰게 되는 나만의 안내자. 배우기 / 새 소식 / 컴패니언 / 물어보기" width="960">
+</p>
+
+<p align="center">
+  <img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-yellow">
+  <img alt="Node.js ≥ 20" src="https://img.shields.io/badge/Node.js-%E2%89%A5%2020-339933?logo=node.js&logoColor=white">
+  <img alt="TypeScript strict" src="https://img.shields.io/badge/TypeScript-strict-3178C6?logo=typescript&logoColor=white">
+  <img alt="Powered by Claude Code" src="https://img.shields.io/badge/powered%20by-Claude%20Code-d97757">
+  <img alt="Language: 한국어" src="https://img.shields.io/badge/UI-%ED%95%9C%EA%B5%AD%EC%96%B4-blue">
+</p>
+
 # Claude Companion (클로드 컴패니언)
 
 > 코딩을 전혀 몰라도 괜찮아요. 이 앱은 여러분이 **Claude Code**(클로드 코드 — 내 컴퓨터에서 직접 일을 해주는 AI 비서)를 처음 만나고, 배우고, 잘 쓰게 도와주는 친절한 안내자입니다.
+>
+> *A local-first Korean web app that helps non-developers learn and master Claude Code — lessons, curated news, a session coach, and an always-there tutor, all running on `claude -p`.*
 
-혹시 "AI한테 일을 시킬 수 있다던데, 나는 컴퓨터를 잘 몰라서…"라고 생각해 보신 적 있나요? 바로 그런 분을 위해 만들었습니다. 이 앱은 여러분의 컴퓨터 안에서만 조용히 돌아가는 작은 웹사이트예요. 어려운 명령어를 외울 필요 없이, 평소 쓰던 인터넷 브라우저(크롬, 사파리 같은 것) 화면에서 클릭하고 글을 쓰면 됩니다.
+**누구를 위한 건가요?** "AI한테 일을 시킬 수 있다던데, 나는 컴퓨터를 잘 몰라서…"라고 생각해 본 분 — 개발자의 가족, 친구, 동료요. 이 앱은 여러분의 컴퓨터 안에서만 조용히 돌아가는 작은 웹사이트예요. 어려운 명령어를 외울 필요 없이, 평소 쓰던 브라우저(크롬, 사파리 같은 것)에서 클릭하고 글을 쓰면 됩니다.
 
-안에는 이런 것들이 들어 있어요. 차근차근 따라 읽을 수 있는 **배우기** 레슨, 매일의 클로드 소식을 쉬운 한국어로 모아 보는 **새 소식**, 일을 더 잘 시키도록 옆에서 코치해 주는 **컴패니언**(companion — '동반자'라는 뜻), 그리고 어느 화면에서든 궁금한 게 생기면 바로 누르는 **❓ 물어보기** 버튼입니다. 천천히, 본인 속도대로 시작해 보세요. 🌱
+**무엇이 들어 있나요?**
+
+- 🎓 **배우기** — "클로드 코드가 뭐예요?"부터 서브에이전트까지, 비개발자 눈높이 한국어 레슨 11개
+- 📰 **새 소식** — 최신 Claude 소식을 쉬운 요약으로, 원하는 블로그를 구독 채널로 추가 가능
+- 🧭 **컴패니언** — 진행 중인 작업 조언, 끝난 작업 **피드백 리포트**, 보내기 전 요청문 다듬기 (모델 추천 + 단계 안내 포함)
+- ❓ **물어보기** — 어느 화면에서든 우하단 버튼 하나로, **보던 내용을 알고 답해주는** 튜터. 글자를 드래그해서 바로 질문할 수도 있어요
+
+천천히, 본인 속도대로 시작해 보세요. 🌱
 
 ## 시작하기 3단계
 
@@ -68,7 +89,7 @@ http://localhost:3456
 | 탭 / 버튼 | 무엇을 하는 곳인가요? |
 |---|---|
 | 🎓 **배우기** | 비개발자 눈높이로 쓴 한국어 레슨을 차례대로 읽는 곳이에요. "클로드 코드가 뭐예요?"부터 시작합니다. |
-| 📰 **새 소식** | 최신 Claude·Claude Code 소식을 쉬운 한국어 요약으로 모아 보는 곳이에요. 소식마다 "이게 나에게 왜 좋은가" 한 줄이 함께 붙어 있어서, 뉴스를 몰라도 흐름을 따라갈 수 있어요. |
+| 📰 **새 소식** | 최신 Claude·Claude Code 소식을 쉬운 한국어 요약으로 모아 보는 곳이에요. 소식마다 "이게 나에게 왜 좋은가" 한 줄이 함께 붙어 있어서, 뉴스를 몰라도 흐름을 따라갈 수 있어요. 자주 보는 블로그가 있다면 **📡 구독 채널**로 등록해 두면 그곳의 새 글도 함께 챙겨 드려요. |
 | 🧭 **컴패니언** | 최근 Claude Code 작업을 읽고 조언이나 다른 관점을 들려주고, 끝난 작업에 대해서는 **피드백 리포트**("이번에 잘하신 점과, 다음엔 이렇게 말해보세요" 식의 따뜻한 돌아보기)를 만들어 주며, AI에게 보낼 요청문을 보내기 전에 같이 다듬어 주는 코치입니다. |
 | ❓ **물어보기** | 어느 화면에서든 우하단 물음표 버튼 — 보던 내용을 알고 답해주는 튜터, 글자를 드래그해서 바로 물어볼 수도 있어요. |
 
@@ -133,6 +154,20 @@ curl -s http://localhost:3456/api/lessons
 ```
 
 검증까지 끝나면 사용자에게 **브라우저에서 `http://localhost:3456` 을 열라고 안내**하고, 첫 방문이라면 🎓 배우기 탭의 첫 레슨부터 읽기를 권하세요. 포트가 사용 중이면 `PORT=다른번호 npm start` 로 바꿔 실행하면 됩니다 (안내하는 주소도 같은 번호로).
+
+## 어떻게 동작하나요? (개발자용 한 문단)
+
+Node 22 + TypeScript + Express 백엔드가 [Claude Code CLI](https://code.claude.com/docs)의 비대화형 모드(`claude -p --output-format json`)를 감싸고, `--resume`으로 대화 연속성을 만듭니다. 프런트는 빌드 단계 없는 vanilla JS(marked + DOMPurify)입니다. 컴패니언은 `~/.claude/projects/`(및 `~/.ccs/instances/*/projects/`)의 세션 JSONL을 직접 읽어 조언·피드백을 만들고, 새 소식은 WebSearch/WebFetch가 허용된 `claude -p` 호출로 큐레이션해 6시간 캐시합니다. 전 구간 인터페이스 계약은 [ARCHITECTURE.md](ARCHITECTURE.md)에 있습니다.
+
+## 기여하기
+
+이슈와 PR을 환영합니다! 특히 다음이 도움이 돼요.
+
+- 레슨/문서의 어색한 표현이나 비개발자에게 어려운 용어 제보
+- 설치 가이드의 스크린샷 채우기 (`docs/getting-started.md`의 `[스크린샷: …]` 자리)
+- 새 레슨 제안 (형식: `docs/learn/NN-slug.md`, 첫 줄 `# 제목`, 400~800자, 끝에 "직접 해보기" 과제)
+
+코드를 고칠 때는 `npm run typecheck`가 통과해야 하고, API를 바꿀 때는 [ARCHITECTURE.md](ARCHITECTURE.md)의 계약을 함께 갱신해 주세요.
 
 ## 라이선스
 
