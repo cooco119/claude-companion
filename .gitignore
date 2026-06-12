@@ -3,3 +3,4 @@ data/sessions.json
 nohup.out
 *.log
 data/news.json
+data/channels.json

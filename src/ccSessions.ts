@@ -36,33 +36,70 @@ const MAX_SESSIONS = 30;
  */
 const SELF_PROJECT = process.cwd().replace(/[^a-zA-Z0-9]/g, '-');
 
-/** 세션 목록 — mtime 내림차순, 최근 30개. 에러는 모두 삼키고 가능한 만큼 반환. */
-export async function listCcSessions(): Promise<CcSessionInfo[]> {
-  let projectDirs: string[] = [];
+/**
+ * 스캔 루트 목록.
+ * - 기본: ~/.claude/projects
+ * - ccs 같은 멀티 인스턴스 도구: ~/.ccs/instances/<이름>/projects 또는
+ *   ~/.ccs/instances/<이름>/.claude/projects (인스턴스별 CLAUDE_CONFIG_DIR 레이아웃 모두 지원).
+ *   이 루트의 세션은 project 라벨 앞에 "ccs:<이름> "을 붙여 구분한다.
+ */
+async function scanRoots(): Promise<Array<{ dir: string; tag: string | null }>> {
+  const roots: Array<{ dir: string; tag: string | null }> = [{ dir: PROJECTS_DIR, tag: null }];
+  const instancesDir = path.join(os.homedir(), '.ccs', 'instances');
+  let instances: string[] = [];
   try {
-    const entries = await fs.readdir(PROJECTS_DIR, { withFileTypes: true });
-    projectDirs = entries.filter((e) => e.isDirectory()).map((e) => e.name);
+    const entries = await fs.readdir(instancesDir, { withFileTypes: true });
+    instances = entries.filter((e) => e.isDirectory()).map((e) => e.name);
   } catch {
-    return []; // ~/.claude/projects 없음
+    return roots; // ~/.ccs/instances 없음 — 기본 루트만
   }
-
-  const candidates: Array<{ path: string; project: string; file: string; mtimeMs: number }> = [];
-  for (const project of projectDirs) {
-    if (project === SELF_PROJECT) continue; // 앱 자신의 -p 세션은 제외
-    const dir = path.join(PROJECTS_DIR, project);
-    let files: string[] = [];
-    try {
-      files = (await fs.readdir(dir)).filter((f) => f.endsWith('.jsonl'));
-    } catch {
-      continue;
-    }
-    for (const file of files) {
-      const full = path.join(dir, file);
+  for (const name of instances) {
+    for (const sub of ['projects', path.join('.claude', 'projects')]) {
+      const dir = path.join(instancesDir, name, sub);
       try {
-        const st = await fs.stat(full);
-        candidates.push({ path: full, project, file, mtimeMs: st.mtimeMs });
+        const st = await fs.stat(dir);
+        if (st.isDirectory()) {
+          roots.push({ dir, tag: name });
+          break; // 한 인스턴스에서 먼저 발견된 레이아웃 하나만
+        }
       } catch {
-        // stat 실패한 파일은 건너뜀
+        // 해당 레이아웃 없음 — 다음 후보
+      }
+    }
+  }
+  return roots;
+}
+
+/** 세션 목록 — 모든 루트를 합쳐 mtime 내림차순, 최근 30개. 에러는 모두 삼키고 가능한 만큼 반환. */
+export async function listCcSessions(): Promise<CcSessionInfo[]> {
+  const candidates: Array<{ path: string; project: string; file: string; mtimeMs: number }> = [];
+
+  for (const root of await scanRoots()) {
+    let projectDirs: string[] = [];
+    try {
+      const entries = await fs.readdir(root.dir, { withFileTypes: true });
+      projectDirs = entries.filter((e) => e.isDirectory()).map((e) => e.name);
+    } catch {
+      continue; // 이 루트는 없음
+    }
+    for (const project of projectDirs) {
+      if (root.tag === null && project === SELF_PROJECT) continue; // 앱 자신의 -p 세션은 제외
+      const dir = path.join(root.dir, project);
+      let files: string[] = [];
+      try {
+        files = (await fs.readdir(dir)).filter((f) => f.endsWith('.jsonl'));
+      } catch {
+        continue;
+      }
+      const label = root.tag === null ? project : `ccs:${root.tag} ${project}`;
+      for (const file of files) {
+        const full = path.join(dir, file);
+        try {
+          const st = await fs.stat(full);
+          candidates.push({ path: full, project: label, file, mtimeMs: st.mtimeMs });
+        } catch {
+          // stat 실패한 파일은 건너뜀
+        }
       }
     }
   }

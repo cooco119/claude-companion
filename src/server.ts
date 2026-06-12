@@ -10,7 +10,8 @@ import { isClaudeCliAvailable, ClaudeError } from './claude.js';
 import * as store from './store.js';
 import { listCcSessions } from './ccSessions.js';
 import { advise, refineTurn, feedback } from './companion.js';
-import { getNews } from './news.js';
+import { getNews, markNewsStale } from './news.js';
+import { listChannels, addChannel, removeChannel } from './channels.js';
 import { listLessons, getLesson } from './lessons.js';
 import { askTurn, coerceAskContext } from './tutor.js';
 
@@ -202,6 +203,45 @@ app.get('/api/companion/news', async (_req: Request, res: Response) => {
     // 캐시 즉시 반환 — 없거나 6시간 지났으면 백그라운드 갱신 시작 후 refreshing:true
     const news = await getNews();
     res.json(news);
+  } catch (err) {
+    sendError(res, err);
+  }
+});
+
+// ── 새 소식: 구독 채널 ────────────────────────────────────
+app.get('/api/news/channels', async (_req: Request, res: Response) => {
+  try {
+    res.json({ channels: await listChannels() });
+  } catch (err) {
+    sendError(res, err);
+  }
+});
+
+app.post('/api/news/channels', async (req: Request, res: Response) => {
+  try {
+    const { url, label } = (req.body ?? {}) as { url?: unknown; label?: unknown };
+    if (typeof url !== 'string' || url.trim() === '') {
+      res.status(400).json({ error: '구독할 채널의 주소(URL)를 입력해 주세요.' });
+      return;
+    }
+    const channels = await addChannel(url, typeof label === 'string' ? label : undefined);
+    markNewsStale(); // 다음 소식 조회에서 새 채널을 반영해 갱신
+    res.json({ channels });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : '';
+    sendError(res, err, msg.includes('이미 구독 중') ? 409 : 400);
+  }
+});
+
+app.delete('/api/news/channels/:id', async (req: Request, res: Response) => {
+  try {
+    const { removed, channels } = await removeChannel(req.params.id);
+    if (!removed) {
+      res.status(404).json({ error: '해당 채널을 찾을 수 없어요.' });
+      return;
+    }
+    markNewsStale();
+    res.json({ channels });
   } catch (err) {
     sendError(res, err);
   }

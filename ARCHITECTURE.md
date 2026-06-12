@@ -54,6 +54,8 @@ type ChatSession = {
 - 목록은 mtime 내림차순, 최근 30개. 미리보기 = 첫 사용자 메시지 앞 80자.
 - **앱 자신의 세션 제외**: 이 앱이 띄우는 claude -p 호출(물어보기/다듬기/조언/소식)도 서버 cwd의
   프로젝트 디렉터리에 세션을 만들므로, cwd 인코딩 디렉터리는 목록에서 제외한다.
+- **추가 스캔 루트(ccs)**: `~/.ccs/instances/<이름>/projects` 또는 `~/.ccs/instances/<이름>/.claude/projects`
+  가 있으면 함께 스캔한다 (멀티 인스턴스 도구 지원). 이 루트의 project 라벨은 `ccs:<이름> <dir>`.
 
 ## HTTP API (src/server.ts가 조립)
 
@@ -70,6 +72,9 @@ type ChatSession = {
 | `POST /api/companion/refine` | `{ draft: string, sessionId?: string }` | `{ reply: string, sessionId: string, costUsd: number, guidance?: Guidance }` — 보내기 전 다듬기 대화 (앱 세션으로 저장, title 앞에 `[다듬기] `) |
 | `POST /api/companion/feedback` | `{ transcriptPath: string }` | `{ report: string /* markdown */, costUsd: number }` — 선택한 CC 세션 회고 → "어떻게 더 잘 쓸지" 피드백 리포트 |
 | `GET /api/companion/news` | - | `{ items: NewsItem[], fetchedAt: string \| null, refreshing: boolean, lastError?: string \| null }` — 캐시 즉시 반환; 캐시가 없거나 6시간 지났으면 백그라운드 갱신 시작 후 `refreshing:true` |
+| `GET /api/news/channels` | - | `{ channels: Channel[] }` — 사용자 구독 채널 목록 |
+| `POST /api/news/channels` | `{ url: string, label?: string }` | `{ channels: Channel[] }` — 추가 (http/https만, 중복 409, 최대 20개). 성공 시 뉴스 캐시를 stale 처리해 다음 조회에서 갱신 |
+| `DELETE /api/news/channels/:id` | - | `{ channels: Channel[] }` — 삭제 (없는 id는 404). 성공 시 뉴스 캐시 stale 처리 |
 
 **제거된 API (v0.2 IA 개편):** `POST /api/chat`(물어보기 `/api/ask`로 대체), `POST /api/companion/news/ask`(FAB 물어보기가 소식 맥락을 흡수). 라우트와 관련 코드를 삭제한다.
 

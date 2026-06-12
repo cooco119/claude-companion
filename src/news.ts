@@ -16,6 +16,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { runClaude } from './claude.js';
+import { listChannels, type Channel } from './channels.js';
 
 export type NewsItem = {
   title: string; // 한국어 제목 (원문이 영어면 번역)
@@ -59,6 +60,19 @@ let refreshing = false;
 /** negative cache: 마지막 실패 시각/메시지 (백오프 + 프런트 실패 표시용) */
 let lastFailedAt = 0;
 let lastErrorMessage: string | null = null;
+
+/** 구독 채널이 바뀌면 TTL과 무관하게 다음 조회에서 갱신하도록 하는 플래그 */
+let staleOverride = false;
+
+/**
+ * 캐시를 낡은 것으로 표시한다 (구독 채널 추가/삭제 시 server.ts가 호출).
+ * 실패 백오프도 초기화해, 채널을 막 추가한 사용자가 10분을 기다리지 않게 한다.
+ */
+export function markNewsStale(): void {
+  staleOverride = true;
+  lastFailedAt = 0;
+  lastErrorMessage = null;
+}
 
 // ── 캐시 읽기/쓰기 ─────────────────────────────────────────
 
@@ -109,7 +123,7 @@ export async function getNews(): Promise<{
   lastError: string | null;
 }> {
   const cache = await readCache();
-  if (!cache || isStale(cache)) {
+  if (!cache || isStale(cache) || staleOverride) {
     // 직전 갱신이 실패했다면 백오프 시간 동안은 재시도하지 않는다
     // (프런트의 10초 폴링/탭 재진입이 실패한 WebSearch 호출을 반복 기동하는 것 방지)
     if (Date.now() - lastFailedAt >= FAILURE_BACKOFF_MS) {
@@ -148,13 +162,24 @@ function startBackgroundRefresh(): void {
 
 // ── 갱신 (claude -p + WebSearch) ──────────────────────────
 
-function buildCurationPrompt(): string {
+function buildCurationPrompt(channels: Channel[]): string {
   const today = new Date().toISOString().slice(0, 10);
+  const channelBlock =
+    channels.length > 0
+      ? [
+          '',
+          '사용자가 직접 구독한 채널도 있습니다. 아래 각 주소를 WebFetch로 직접 열어,',
+          '최근 2주 사이의 새 글이 있으면 큐레이션에 포함해 주세요 (이 채널들의 항목은',
+          '"source"를 "구독: <채널 이름>" 형태로 적어 주세요):',
+          ...channels.map((c) => `- ${c.label}: ${c.url}`),
+        ]
+      : [];
   return [
     '당신은 코딩을 모르는 비개발자를 위해 Claude 소식을 골라 주는 한국어 에디터입니다.',
     `오늘 날짜는 ${today} 입니다. 웹 검색(WebSearch)을 사용해서, 오늘 기준 최근 2주 사이의`,
     'Claude / Claude Code 소식, 좋은 사용 패턴, 새로운 하네스·루프 디자인을 찾아 주세요.',
     '찾아볼 곳: Anthropic 블로그, Claude 공식 문서(docs), X(@karpathy 포함), Hacker News.',
+    ...channelBlock,
     '',
     '가장 흥미롭고 유용한 것 5~8개를 골라, 답변 마지막에 아래 형식의 JSON 배열 하나를',
     '```json 펜스 코드블록으로 출력하세요. 각 항목은 다음 5개 필드를 모두 가져야 합니다:',
@@ -174,14 +199,18 @@ function buildCurationPrompt(): string {
 
 /** 실제 갱신 1회: 검색·큐레이션 → 추출·검증 → 캐시 저장. 실패 시 throw (호출부가 경고). */
 async function refreshNews(): Promise<void> {
-  const result = await runClaude(buildCurationPrompt(), {
-    extraArgs: ['--allowedTools', 'WebSearch'],
+  const channels = await listChannels();
+  // 구독 채널이 있으면 그 주소를 직접 열 수 있게 WebFetch도 허용한다
+  const allowedTools = channels.length > 0 ? ['WebSearch', 'WebFetch'] : ['WebSearch'];
+  const result = await runClaude(buildCurationPrompt(channels), {
+    extraArgs: ['--allowedTools', ...allowedTools],
   });
   const items = extractNewsItems(result.text);
   if (items.length === 0) {
     throw new Error('응답에서 유효한 소식 항목을 하나도 추출하지 못했어요.');
   }
   await writeCache({ fetchedAt: new Date().toISOString(), items });
+  staleOverride = false; // 채널 변경분이 반영된 새 캐시
   console.log(`[news] 소식 ${items.length}건을 갱신했어요.`);
 }
 

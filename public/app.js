@@ -131,6 +131,7 @@
       if (currentTab === 'companion') loadCcSessions();
       if (currentTab === 'news') {
         loadNews(false); // 탭 진입 시마다 소식 갱신 확인
+        loadChannels();
       } else {
         stopNewsPolling(); // 새 소식 탭을 떠나면 폴링 중단
       }
@@ -331,6 +332,99 @@
       newsLoading = false;
     });
   }
+
+  // ---------- 새 소식: 📡 구독 채널 ----------
+
+  var channelsListEl = $('#channels-list');
+  var channelsErrorEl = $('#channels-error');
+  var channelsCountEl = $('#channels-count');
+  var channelsNoteEl = $('#channels-note');
+  var channelUrlInput = $('#channel-url-input');
+  var channelLabelInput = $('#channel-label-input');
+  var channelAddBtn = $('#channel-add-btn');
+  var channelsBusy = false;
+
+  function renderChannels(channels) {
+    channelsListEl.innerHTML = '';
+    channelsCountEl.textContent = channels.length > 0 ? '(' + channels.length + '개)' : '';
+    if (channels.length === 0) {
+      channelsListEl.appendChild(el('li', 'channels-empty',
+        '아직 추가한 채널이 없어요. 자주 보는 블로그 주소를 등록해 보세요.'));
+      return;
+    }
+    channels.forEach(function (c) {
+      var li = el('li', 'channel-item');
+      var info = el('div', 'channel-info');
+      info.appendChild(el('span', 'channel-label', String(c.label || '')));
+      info.appendChild(el('span', 'channel-url', String(c.url || '')));
+      li.appendChild(info);
+      var delBtn = el('button', 'channel-del-btn', '삭제');
+      delBtn.type = 'button';
+      delBtn.addEventListener('click', function () { deleteChannel(c.id); });
+      li.appendChild(delBtn);
+      channelsListEl.appendChild(li);
+    });
+  }
+
+  function loadChannels() {
+    api('/api/news/channels').then(function (data) {
+      renderChannels(data.channels || []);
+    }).catch(function (err) {
+      showError(channelsErrorEl, err.message);
+    });
+  }
+
+  /** 채널 추가/삭제 성공 공통 처리: 목록 갱신 + 안내 + 소식 재조회(서버가 stale 처리해 둠) */
+  function onChannelsChanged(channels) {
+    renderChannels(channels || []);
+    channelsNoteEl.classList.remove('hidden');
+    loadNews(false); // 서버가 캐시를 낡은 것으로 표시했으므로 갱신 배너/폴링이 자연스럽게 시작된다
+  }
+
+  function addChannelFromInputs() {
+    if (channelsBusy) return;
+    var url = channelUrlInput.value.trim();
+    if (url === '') {
+      showError(channelsErrorEl, '구독할 채널의 주소(URL)를 먼저 붙여넣어 주세요.');
+      return;
+    }
+    channelsBusy = true;
+    channelAddBtn.disabled = true;
+    hideError(channelsErrorEl);
+    channelsNoteEl.classList.add('hidden');
+    apiPost('/api/news/channels', { url: url, label: channelLabelInput.value.trim() })
+      .then(function (data) {
+        channelUrlInput.value = '';
+        channelLabelInput.value = '';
+        onChannelsChanged(data.channels);
+      })
+      .catch(function (err) { showError(channelsErrorEl, err.message); })
+      .finally(function () {
+        channelsBusy = false;
+        channelAddBtn.disabled = false;
+      });
+  }
+
+  function deleteChannel(id) {
+    if (channelsBusy) return;
+    channelsBusy = true;
+    hideError(channelsErrorEl);
+    channelsNoteEl.classList.add('hidden');
+    api('/api/news/channels/' + encodeURIComponent(id), { method: 'DELETE' })
+      .then(function (data) { onChannelsChanged(data.channels); })
+      .catch(function (err) { showError(channelsErrorEl, err.message); })
+      .finally(function () { channelsBusy = false; });
+  }
+
+  channelAddBtn.addEventListener('click', addChannelFromInputs);
+  [channelUrlInput, channelLabelInput].forEach(function (input) {
+    input.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        addChannelFromInputs();
+      }
+    });
+  });
 
   // ============================================================
   // 🧭 컴패니언 — (좌) 최근 작업: 조언 / 피드백 리포트
