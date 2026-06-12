@@ -22,7 +22,7 @@
 
 ## 1. Node.js 설치하기
 
-**Node.js**(노드제이에스)는 Claude Code가 돌아가는 데 필요한 바탕 프로그램이에요. 전자제품을 쓰려면 먼저 콘센트(전기)가 있어야 하듯, Claude Code를 쓰려면 먼저 Node.js가 있어야 합니다.
+**Node.js**(노드제이에스)는 나중에 설치할 **클로드 컴패니언 앱**이 돌아가는 데 필요한 바탕 프로그램이에요. 전자제품을 쓰려면 먼저 콘센트(전기)가 있어야 하듯, 이 앱을 쓰려면 먼저 Node.js가 있어야 합니다. (Claude Code 자체는 Node.js 없이도 설치되지만, 어차피 앱에 필요하니 지금 같이 설치해 두는 게 편해요.)
 
 1. 브라우저에서 [https://nodejs.org](https://nodejs.org) 를 여세요.
 2. 초록색 큰 버튼 중 **LTS**(엘티에스 — '오래 안정적으로 지원되는 버전'이라는 뜻)라고 쓰인 쪽을 클릭해 내려받으세요.
@@ -38,16 +38,27 @@ node -v
 
 ## 2. Claude Code 설치하기
 
-이제 터미널에 아래 한 줄을 입력하세요. "Claude Code를 내 컴퓨터 전체에서 쓸 수 있게 설치해줘"라는 뜻이에요.
+이제 Claude Code를 설치할 차례예요. 운영체제에 맞는 **한 줄**을 터미널에 붙여넣고 Enter를 누르면 끝입니다. "인터넷에서 설치 프로그램을 받아와서 바로 실행해줘"라는 뜻이에요.
+
+**macOS(맥)** — 터미널에:
 
 ```bash
-npm install -g @anthropic-ai/claude-code
+curl -fsSL https://claude.ai/install.sh | bash
 ```
 
-- `npm`은 Node.js와 함께 설치된 '프로그램 가게' 같은 도구이고, `-g`는 "이 컴퓨터 어디서든 쓰게(global)"라는 뜻입니다.
-- 글자들이 주르륵 올라가다가 멈추면 끝난 거예요. 1~2분 걸릴 수 있어요. 끝나면 `added 3 packages ...` 처럼 무언가 추가되었다는 영어 문장이 보입니다.
+**Windows** — PowerShell(파워셸) 창에:
 
-> macOS에서 "permission denied(권한 없음)" 에러가 나면, 맨 앞에 `sudo `를 붙여 `sudo npm install -g @anthropic-ai/claude-code` 로 다시 시도해 보세요. 컴퓨터 비밀번호를 물어보면 입력하면 됩니다(입력해도 화면에 글자가 안 보이는 게 정상이에요).
+```powershell
+irm https://claude.ai/install.ps1 | iex
+```
+
+- 글자들이 주르륵 올라가다가 멈추면 끝난 거예요. 1~2분 걸릴 수 있어요.
+- 설치가 끝나면 **터미널 창을 닫았다가 다시 열고** `claude --version` 을 입력해 보세요. 숫자(버전)가 나오면 성공입니다.
+- 이렇게 설치하면 앞으로 **새 버전이 나올 때마다 자동으로 업데이트**돼서 신경 쓸 게 없어요.
+
+> **Windows에서 `irm` 명령이 인식되지 않는다는 에러가 나면**, 지금 열린 창이 PowerShell이 아니라 CMD(명령 프롬프트)인 거예요. 창의 맨 앞 글자를 보세요 — `PS C:\` 로 시작하면 PowerShell, 그냥 `C:\` 로 시작하면 CMD입니다. 시작 메뉴에서 "PowerShell"을 검색해 새로 열고 다시 시도해 주세요.
+
+> 예전 안내(`npm install -g @anthropic-ai/claude-code`)를 본 적이 있다면, 지금은 위의 방법이 공식 권장이에요. 둘 다 동작하지만 위 방법이 더 간단하고 자동 업데이트까지 됩니다.
 
 ## 3. Claude 계정 만들기 (가입)
 

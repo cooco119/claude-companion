@@ -13,7 +13,7 @@
 먼저 AI 비서인 Claude Code를 쓸 수 있는 상태로 만들어야 해요. 크게 세 가지입니다.
 
 1. **가입** — [claude.ai](https://claude.ai) 에서 Claude 계정을 만들어요 (구글 계정이나 이메일이면 충분해요). Claude Code를 쓰려면 유료 구독(Pro 또는 Max)이 필요합니다.
-2. **설치** — Node.js를 설치한 뒤, 터미널에서 `npm install -g @anthropic-ai/claude-code` 한 줄로 Claude Code를 설치해요.
+2. **설치** — 터미널에서 한 줄로 Claude Code를 설치해요. macOS는 `curl -fsSL https://claude.ai/install.sh | bash`, Windows는 PowerShell에서 `irm https://claude.ai/install.ps1 | iex` 입니다. (이 앱을 위해 Node.js도 설치해요 — 가이드에서 함께 안내합니다.)
 3. **로그인** — 터미널에서 `claude` 를 실행하면 브라우저가 열리며 로그인을 안내해 줘요. 한 번만 하면 컴퓨터가 기억합니다.
 
 처음이라면 아래 가이드를 그대로 따라 하시면 됩니다. '터미널이 뭐예요?'부터 시작하니 걱정 마세요.
@@ -109,7 +109,9 @@ AI 비서인 Claude Code가 아직 설치되지 않았거나 로그인이 안 �
 # 0. 사전 조건 확인
 node --version    # v20 이상이어야 함. 없으면: 사용자에게 https://nodejs.org LTS 설치를 안내
 git --version     # 없으면: OS에 맞게 git 설치 (macOS: xcode-select --install / Windows: git-scm.com)
-claude --version  # 없으면: npm install -g @anthropic-ai/claude-code
+claude --version  # 없으면 네이티브 설치(권장):
+                  #   macOS/Linux/WSL: curl -fsSL https://claude.ai/install.sh | bash
+                  #   Windows PowerShell: irm https://claude.ai/install.ps1 | iex
                   # 설치 후 로그인이 안 돼 있으면 사용자가 직접 `claude`를 실행해
                   # 브라우저 인증을 마치도록 안내해야 함 (에이전트가 대신 로그인할 수 없음)
 
